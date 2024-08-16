@@ -1,10 +1,7 @@
-import serial
-import serial.tools.list_ports
-from time import sleep
 import asyncio
 import serial_asyncio
-import time
 import threading
+import time
 
 def CRC_Check(CRC_Ptr, LEN):
     CRC_Value = 0xffff
@@ -21,28 +18,21 @@ def CRC_Check(CRC_Ptr, LEN):
 
 class uart:
     def __init__(self):
-        self.ser = None
         self.port = None
-        self.baudrate = None
         self._PC_SN = 1
         self._SLE_SERVER_LIST = []
         self.data = []
+        self.writer = None
+        self.close_flag = False
     
     async def open(self, port, baudrate):
         self.reader, self.writer = await serial_asyncio.open_serial_connection(url=port, baudrate=baudrate)
-        rec_task = asyncio.create_task(self.read_from_serial(self.reader))
-        write_task = asyncio.create_task(self.write(self.writer))
-        await rec_task
-        await write_task
-
-    async def read_from_serial(self,reader):
-        while True:
-            data = await reader.read(1000)
-            try:
-                # self.uart_recv_data_handle(data)
-                print("recv data:", data)
-            except Exception as e:
-                print(e)
+        self.rec_task = asyncio.create_task(self.read_from_serial(self.reader))
+        self.write_task = asyncio.create_task(self.write(self.writer))
+        tasks = [self.rec_task, self.write_task]
+        done, pending = await asyncio.wait(tasks,return_when="ALL_COMPLETED")
+        for task in pending:
+            task.cancel()
 
     def sle_connect_server(self, addr: list):
         data = bytearray([0xFF, 0xFF, 0x00, 0x0E, self._PC_SN, 0x02, 0x00, 0x01, 0x00, 0x06, addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]])
@@ -93,13 +83,6 @@ class uart:
     def uart_send(self, data):
         self.data.append(data)
 
-    async def write(self, writer):
-        while True:
-            if len(self.data) > 0:
-                writer.write(self.data.pop(0))
-                await writer.drain()
-            await asyncio.sleep(0.1)
-    
     def uart_cmd_parse(self, cmd, value_len, value):
         if cmd == 0x0003:
             data = value.hex()
@@ -146,15 +129,32 @@ class uart:
                 index += 1
                 print("serial data head error!")
 
+    async def read_from_serial(self,reader):
+        while True:
+            data = await reader.read(1000)
+            try:
+                # self.uart_recv_data_handle(data)
+                print("recv data:", data.hex())
+            except Exception as e:
+                print(e)
+    
+    async def write(self, writer):
+        while True:
+            if len(self.data) > 0:
+                writer.write(self.data.pop(0))
+                await writer.drain()
+            await asyncio.sleep(0.2)
+        try:
+            await self.rec_task
+        except asyncio.CancelledError:
+            print("Main was cancelled!")
 
-def main_thread():
+    def close(self):
+        self.writer.close()
+        if self.write_task:
+            self.write_task.cancel()
+        if self.rec_task:
+            self.rec_task.cancel()
 
-    asyncio.run(ut.open("com30", 115200))
-
-if __name__ == '__main__':
-    ut = uart()
-    thread = threading.Thread(target=main_thread)
-    thread.start()
-    ut.sle_scan_device(0x01)
-    for i in range(10):
-        ut.sle_connect_server([0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+def uart_thread(ut,com):
+    asyncio.run(ut.open(com, 115200))
