@@ -9,38 +9,35 @@ from time import sleep
 class main:
     def __init__(self):
         self.ut = uart()
-        
+        self.ut_thread = None
+
+    def heartbeat_thread(self):
+        if self.ut._connect:
+            self.ut.sle_hearbeat()
+            self.ut._connect = False
+            threading.Timer(5, self.heartbeat_thread).run()
+        else:
+            self.stop_uart_thread()
+            
+
     def stop_uart_thread(self):
         self.ut.close()
-        print("stop uart thread")
-        self.thread.join()
-        print("thread joined")
+        if self.ut_thread:
+            self.ut_thread.join()
+            self.ut_thread = None
 
     def start_uart_thread(self):
-        self.thread = threading.Thread(target=uart_thread, args=(self.ut,'COM30'))
-        self.thread.start()
-
-def kill_thread(ident):
-    try:
-        tid = ident
-        if not inspect.isclass(SystemExit):
-            raise TypeError("Only types can be raised (not instances)")
-        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(tid), ctypes.py_object(SystemExit))
-        if res == 0:
-            print("invalid thread id")
-        elif res != 1:
-            # """if it returns a number greater than one, you're in trouble,
-            # and you should call it again with exc=NULL to revert the effect"""
-            ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
-            raise SystemError("PyThreadState_SetAsyncExc failed")
-    except Exception as e:
-        print(e)
+        self.ut_thread = threading.Thread(target=uart_thread, args=(self.ut,'COM30'))
+        self.ut_thread.start()
+        self.ut.sn_reset()
+        self.ut.sle_hearbeat()
+        threading.Timer(5, self.heartbeat_thread).run()
 
 if __name__ == '__main__':
     m = main()
     m.start_uart_thread()
-    sleep(2)
+    sleep(5)
     m.stop_uart_thread()
     m.start_uart_thread()
-    sleep(3)
+    sleep(5)
     m.stop_uart_thread()

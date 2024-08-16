@@ -24,6 +24,7 @@ class uart:
         self.data = []
         self.writer = None
         self.close_flag = False
+        self._connect = False
     
     async def open(self, port, baudrate):
         self.reader, self.writer = await serial_asyncio.open_serial_connection(url=port, baudrate=baudrate)
@@ -33,6 +34,17 @@ class uart:
         done, pending = await asyncio.wait(tasks,return_when="ALL_COMPLETED")
         for task in pending:
             task.cancel()
+
+    def sn_reset(self):
+        self._PC_SN = 1
+
+    def sle_hearbeat(self):
+        data = bytearray([0xFF, 0xFF, 0x00, 0x08, self._PC_SN, 0x02, 0x00, 0x00, 0x00, 0x00])
+        crc = CRC_Check(data, len(data))
+        data.append(crc >> 8)
+        data.append(crc & 0xFF)
+        self.uart_send(data)
+        self._PC_SN += 1
 
     def sle_connect_server(self, addr: list):
         data = bytearray([0xFF, 0xFF, 0x00, 0x0E, self._PC_SN, 0x02, 0x00, 0x01, 0x00, 0x06, addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]])
@@ -66,26 +78,35 @@ class uart:
         self.uart_send(data)
         self._PC_SN += 1
 
-    def sle_send_data(self, msg: list):
-        data = bytearray([0xFF, 0xFF, 0x00, 0x0C, self._PC_SN, 0x02, 0x00, 0x05, 0x00, 0x00])
-        data[3] = (len(data) - 4) >> 8
-        data[4] = (len(data) - 4) & 0xFF
-        data[8] = (len(msg) >> 8) & 0xFF
-        data[9] = len(msg) & 0xFF
-        for i in msg:
-            data.append(i)
-        crc = CRC_Check(data, len(data))
-        data.append(crc >> 8)
-        data.append(crc & 0xFF)
-        self.uart_send(data)
-        self._PC_SN += 1
+    def sle_send_data(self, message: list):
+        for i in range(0,len(message),251):
+            if i + 251 > len(message):
+                msg = message[i:]
+            else:
+                msg = message[i:i+251]
+            data = bytearray([0xFF, 0xFF, 0x00, 0x0C, self._PC_SN, 0x02, 0x00, 0x05, 0x00, 0x00])
+            data[8] = (len(msg) >> 8) & 0xFF
+            data[9] = len(msg) & 0xFF
+            for i in msg:
+                data.append(i)
+            crc = CRC_Check(data, len(data))
+            data.append(crc >> 8)
+            data.append(crc & 0xFF)
+            print(len(data))
+            data[2] = (len(data) - 4) >> 8
+            data[3] = (len(data) - 4) & 0xFF
+            self.uart_send(data)
+            self._PC_SN += 1
+            print(self._PC_SN)
 
     def uart_send(self, data):
         self.data.append(data)
 
     def uart_cmd_parse(self, cmd, value_len, value):
-        if cmd == 0x0003:
-            data = value.hex()
+        data = value.hex()
+        if cmd == 0x0000:
+            self._connect = True
+        elif cmd == 0x0003:
             Type = data[0:2]
             rssi = int(data[2:4], 16)   # RSSI
             if rssi >= 0x80:
@@ -97,7 +118,9 @@ class uart:
         elif cmd == 0x0004:
             print("对端设备RSSI：", value)
         elif cmd == 0x0005:
-            print("收到SERVER数据：", value)
+            MAC = data[0:12]
+            msg = data[12:]
+            print(f"收到SLE设备数据：MAC:{MAC},数据：{msg}")
 
     def uart_recv_data_handle(self, data):
         print("recv data:", data.hex())
@@ -144,10 +167,6 @@ class uart:
                 writer.write(self.data.pop(0))
                 await writer.drain()
             await asyncio.sleep(0.2)
-        try:
-            await self.rec_task
-        except asyncio.CancelledError:
-            print("Main was cancelled!")
 
     def close(self):
         self.writer.close()
