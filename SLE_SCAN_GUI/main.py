@@ -15,7 +15,7 @@ class main:
         if self.ut._connect:
             self.ut.sle_hearbeat()
             self.ut._connect = False
-            threading.Timer(5, self.heartbeat_thread).run()
+            threading.Timer(2, self.heartbeat_thread).run()
         else:
             self.stop_uart_thread()
             
@@ -31,7 +31,7 @@ class main:
         self.ut_thread.start()
         self.ut.sn_reset()
         self.ut.sle_hearbeat()
-        threading.Timer(5, self.heartbeat_thread).run()
+        threading.Timer(2, self.heartbeat_thread).run()
 
 if __name__ == '__main__':
     m = main()
