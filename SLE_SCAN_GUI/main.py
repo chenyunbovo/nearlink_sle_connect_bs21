@@ -1,15 +1,43 @@
 import threading
-import time
-# 定义回调函数
-def timer_callback():
-    e = time.time()
-    print(e-s)  
-    print("定时器触发！")
+from uart import uart, uart_thread
+import serial
+import serial.tools.list_ports
+import inspect
+import ctypes
+from time import sleep
 
+class main:
+    def __init__(self):
+        self.ut = uart()
+        self.ut_thread = None
 
-# 创建一个定时器，10秒后触发
+    def heartbeat_thread(self):
+        if self.ut._connect:
+            self.ut.sle_hearbeat()
+            self.ut._connect = False
+            threading.Timer(2, self.heartbeat_thread).run()
+        else:
+            self.stop_uart_thread()
+            
 
-timer = threading.Timer(10.0, timer_callback)
-s = time.time()
-# 启动定时器
-timer.start()
+    def stop_uart_thread(self):
+        self.ut.close()
+        if self.ut_thread:
+            self.ut_thread.join()
+            self.ut_thread = None
+
+    def start_uart_thread(self):
+        self.ut_thread = threading.Thread(target=uart_thread, args=(self.ut,'COM30'))
+        self.ut_thread.start()
+        self.ut.sn_reset()
+        self.ut.sle_hearbeat()
+        threading.Timer(2, self.heartbeat_thread).run()
+
+if __name__ == '__main__':
+    m = main()
+    m.start_uart_thread()
+    sleep(5)
+    m.stop_uart_thread()
+    m.start_uart_thread()
+    sleep(5)
+    m.stop_uart_thread()
