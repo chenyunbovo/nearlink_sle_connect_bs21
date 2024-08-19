@@ -18,7 +18,13 @@ class main:
             threading.Timer(2, self.heartbeat_thread).run()
         else:
             self.stop_uart_thread()
-            
+
+    def sle_scan_done(self):
+        self.ut.sle_scan_device(0)
+
+    def sle_start_scan(self):
+        self.ut.sle_scan_device(1)
+        threading.Timer(15, self.sle_scan_done).run()
 
     def stop_uart_thread(self):
         self.ut.close()
@@ -27,17 +33,15 @@ class main:
             self.ut_thread = None
 
     def start_uart_thread(self):
-        self.ut_thread = threading.Thread(target=uart_thread, args=(self.ut,'COM30'))
+        self.ut_thread = threading.Thread(target=uart_thread, args=(self.ut,'COM7'))
         self.ut_thread.start()
         self.ut.sn_reset()
-        self.ut.sle_hearbeat()
-        threading.Timer(2, self.heartbeat_thread).run()
+        # self.ut.sle_hearbeat()
+        # threading.Timer(2, self.heartbeat_thread).run()
+        self.sle_start_scan()
 
 if __name__ == '__main__':
     m = main()
     m.start_uart_thread()
-    sleep(5)
-    m.stop_uart_thread()
-    m.start_uart_thread()
-    sleep(5)
-    m.stop_uart_thread()
+    while True:
+        sleep(1)

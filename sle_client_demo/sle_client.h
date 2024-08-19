@@ -15,7 +15,7 @@ void sle_stop_scan(void);
 void sle_client_connect(uint8_t *addr);
 
 // 断开连接函数
-void sle_client_disconnect(void);
+void sle_client_disconnect(uint8_t *addr);
 
 // 获取已连接设备的RSSI
 void sle_client_get_rssi(void);

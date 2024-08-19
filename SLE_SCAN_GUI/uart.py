@@ -156,14 +156,14 @@ class uart:
         while True:
             data = await reader.read(1000)
             try:
-                # self.uart_recv_data_handle(data)
-                print("recv data:", data.hex())
+                self.uart_recv_data_handle(data)
             except Exception as e:
                 print(e)
     
     async def write(self, writer):
         while True:
             if len(self.data) > 0:
+                print("send data:", self.data[0].hex())
                 writer.write(self.data.pop(0))
                 await writer.drain()
             await asyncio.sleep(0.2)
@@ -175,5 +175,5 @@ class uart:
         if self.rec_task:
             self.rec_task.cancel()
 
-def uart_thread(ut,com):
-    asyncio.run(ut.open(com, 115200))
+def uart_thread(ut:uart,com:str):
+    asyncio.run(ut.open(com, 921600))
