@@ -55,13 +55,36 @@ static uint16_t CRC_Check(uint8_t *CRC_Ptr,uint8_t LEN)
     return CRC_Value;
 }
 
+void sle_send_heartbeat(void)
+{
+    uint16_t total_len  = 12;
+    uint8_t *send_buff = (uint8_t *)osal_vmalloc(total_len);
+    if (send_buff == NULL) {
+        osal_printk("uart%d send data malloc fail!\r\n", USER_UART);
+        return;
+    }
+    send_buff[0] = PROTOCOL_HEAD;
+    send_buff[1] = PROTOCOL_HEAD;
+    send_buff[2] = (total_len - 4) >> 8;
+    send_buff[3] = (total_len - 4) & 0xFF;
+    send_buff[4] = PICO_SN;
+    send_buff[5] = PICO_TO_PC_FLAG;
+    send_buff[6] = 0x00;
+    send_buff[7] = 0x00;
+    send_buff[8] = 0x00;
+    send_buff[9] = 0x00;
+    uint16_t crc = CRC_Check(send_buff, total_len - 2);
+    send_buff[total_len - 2] = crc >> 8;
+    send_buff[total_len - 1] = crc & 0xFF;
+    hal_uart_write(USER_UART, send_buff, total_len);
+    PICO_SN++;
+    if (send_buff != NULL) {
+        osal_vfree(send_buff);
+    }
+}
+
 void sle_send_scan_data(uint8_t *data, uint16_t len, uint8_t *addr, uint8_t type, uint8_t rssi)
 {
-    unused(data);
-    unused(len);
-    unused(addr);
-    unused(type);
-    unused(rssi);
     uint16_t total_len = len + 20;
     len = len + 8;
     uint8_t *send_buff = (uint8_t *)osal_vmalloc(total_len);
@@ -97,9 +120,9 @@ void sle_send_scan_data(uint8_t *data, uint16_t len, uint8_t *addr, uint8_t type
     }
 }
 
-void sle_send_connect_done(uint8_t *addr)
+void sle_send_connect_done(uint8_t *addr, uint8_t conn_id)
 {
-    uint16_t total_len = 18;
+    uint16_t total_len = 19;
     uint8_t *send_buff = (uint8_t *)osal_vmalloc(total_len);
     if (send_buff == NULL) {
         osal_printk("uart%d send data malloc fail!\r\n", USER_UART);
@@ -118,9 +141,10 @@ void sle_send_connect_done(uint8_t *addr)
     for (uint16_t i = 0; i < 6; i++) {
         send_buff[10 + i] = addr[i];
     }
-    uint16_t crc = CRC_Check(send_buff, 16);
-    send_buff[16] = crc >> 8;
-    send_buff[17] = crc & 0xFF;
+    send_buff[16] = conn_id;
+    uint16_t crc = CRC_Check(send_buff, total_len - 2);
+    send_buff[total_len - 2] = crc >> 8;
+    send_buff[total_len - 1] = crc & 0xFF;
     hal_uart_write(USER_UART, send_buff, total_len);
     PICO_SN++;
     if (send_buff != NULL) {
@@ -160,10 +184,9 @@ void sle_send_disconnet_reason(uint8_t *addr, uint8_t dis_res)
     }
 }
 
-
-void sle_send_rssi_data(uint8_t value)
+void sle_send_rssi_data(uint8_t conn_id, uint8_t rssi)
 {
-    uint16_t total_len = 13;
+    uint16_t total_len = 14;
     uint8_t *send_buff = (uint8_t *)osal_vmalloc(total_len);
     if (send_buff == NULL) {
         osal_printk("uart%d send data malloc fail!\r\n", USER_UART);
@@ -179,10 +202,11 @@ void sle_send_rssi_data(uint8_t value)
     send_buff[7] = 0x04;
     send_buff[8] = 0x00;
     send_buff[9] = 0x01;
-    send_buff[10] = value;
-    uint16_t crc = CRC_Check(send_buff, 11);
-    send_buff[11] = crc >> 8;
-    send_buff[12] = crc & 0xFF;
+    send_buff[10] = conn_id;
+    send_buff[11] = rssi;
+    uint16_t crc = CRC_Check(send_buff, 12);
+    send_buff[12] = crc >> 8;
+    send_buff[13] = crc & 0xFF;
     hal_uart_write(USER_UART, send_buff, total_len);
     PICO_SN++;
     if (send_buff != NULL) {
@@ -190,9 +214,9 @@ void sle_send_rssi_data(uint8_t value)
     }
 }
 
-void sle_send_custom_data(uint8_t *data, uint16_t len)
+void sle_send_custom_data(uint8_t conn_id, uint8_t *data, uint16_t len)
 {
-    uint16_t total_len = len + 12;
+    uint16_t total_len = len + 13;
     uint8_t *send_buff = (uint8_t *)osal_vmalloc(total_len);
     if (send_buff == NULL) {
         osal_printk("uart%d send data malloc fail!\r\n", USER_UART);
@@ -208,12 +232,45 @@ void sle_send_custom_data(uint8_t *data, uint16_t len)
     send_buff[7] = 0x03;
     send_buff[8] = len >> 8;
     send_buff[9] = len & 0xFF;
+    send_buff[10] = conn_id;
     for (uint16_t i = 0; i < len; i++) {
-        send_buff[10 + i] = data[i];
+        send_buff[11 + i] = data[i];
     }
-    uint16_t crc = CRC_Check(send_buff, len + 10);
-    send_buff[len + 10] = crc >> 8;
-    send_buff[len + 11] = crc & 0xFF;
+    uint16_t crc = CRC_Check(send_buff, len + 11);
+    send_buff[len + 11] = crc >> 8;
+    send_buff[len + 12] = crc & 0xFF;
+    hal_uart_write(USER_UART, send_buff, total_len);
+    PICO_SN++;
+    if (send_buff != NULL) {
+        osal_vfree(send_buff);
+    }
+}
+
+void sle_send_property_data(uint8_t conn_id, uint16_t handle, uint8_t type)
+{
+    uint16_t total_len = 16;
+    uint8_t *send_buff = (uint8_t *)osal_vmalloc(total_len);
+    if (send_buff == NULL) {
+        osal_printk("uart%d send data malloc fail!\r\n", USER_UART);
+        return;
+    }
+    send_buff[0] = PROTOCOL_HEAD;
+    send_buff[1] = PROTOCOL_HEAD;
+    send_buff[2] = (total_len - 4) >> 8;
+    send_buff[3] = (total_len - 4) & 0xFF;
+    send_buff[4] = PICO_SN;
+    send_buff[5] = PICO_TO_PC_FLAG;
+    send_buff[6] = 0x00;
+    send_buff[7] = 0x04;
+    send_buff[8] = 0x00;
+    send_buff[9] = 0x01;
+    send_buff[10] = conn_id;
+    send_buff[11] = handle >> 8;
+    send_buff[12] = handle & 0xFF;
+    send_buff[13] = type;
+    uint16_t crc = CRC_Check(send_buff, 13);
+    send_buff[14] = crc >> 8;
+    send_buff[15] = crc & 0xFF;
     hal_uart_write(USER_UART, send_buff, total_len);
     PICO_SN++;
     if (send_buff != NULL) {
@@ -225,6 +282,9 @@ static void uart_cmd_parse(uint16_t cmd, uint16_t value_len, uint8_t *value)
 {
     printf("uart receive data cmd: 0x%x\r\n", cmd);
     switch (cmd) {
+    case SLE_HEARTBEAT_CMD:
+        sle_send_heartbeat();
+        break;
     case SLE_CONNECT_CMD:
         sle_client_connect(value);
         break;
@@ -232,18 +292,22 @@ static void uart_cmd_parse(uint16_t cmd, uint16_t value_len, uint8_t *value)
         sle_client_disconnect(value);
         break;
     case SLE_SCAN_CMD:
-        if (value[0] == 0x01) {
+        if (value[0] == 0x00) {
             sle_stop_scan();
-        } else if (value[0] == 0x02) {
+        } else if (value[0] == 0x01) {
             sle_start_scan();
         }
         break;
     case SLE_GET_RSSI_CMD:
-        sle_client_get_rssi();
+        sle_client_get_rssi(value[0]);
         break;
-    case SLE_SEND_CMD:
-        sle_write(value, value_len);
+    case SLE_SEND_CMD: {
+        uint8_t conn_id = value[0];
+        uint16_t handle = (value[1] << 8) | value[2];
+        uint8_t type = value[3];
+        sle_write(conn_id, handle, type, value + 4, value_len - 4);
         break;
+    }
     default:
         osal_printk("uart%d receive data cmd error!\r\n", USER_UART);
         break;
@@ -264,7 +328,7 @@ static void uart_data_handle(void)
             if (crc == crc_check) {
                 uint8_t flag = g_app_uart_rx_buff[5];
                 if (flag == PC_TO_PICO_FLAG) {
-                    if(PC_SN < g_app_uart_rx_buff[4]) {
+                    if(PC_SN != g_app_uart_rx_buff[4]) {
                         PC_SN = g_app_uart_rx_buff[4];
                         for (uint8_t i = 6; i < len - 2;) {
                             uint16_t cmd = (g_app_uart_rx_buff[i] << 8) | g_app_uart_rx_buff[i + 1];
