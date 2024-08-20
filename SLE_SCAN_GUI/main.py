@@ -18,7 +18,6 @@ class main:
             threading.Timer(2, self.heartbeat_thread).run()
         else:
             self.stop_uart_thread()
-            
 
     def stop_uart_thread(self):
         self.ut.close()
