@@ -78,14 +78,14 @@ void sle_stop_scan(void)
     sle_stop_seek();
 }
 
-void sle_client_disconnect(void)
+void sle_client_disconnect(uint8_t *addr)
 {
+    memcpy_s(g_sle_remote_addr.addr, sizeof(g_sle_remote_addr.addr), addr, 6);
     sle_disconnect_remote_device(&g_sle_remote_addr);
 }
 
 void sle_client_connect(uint8_t *addr)
 {
-    sle_remove_paired_remote_device(&g_sle_remote_addr);
     memcpy_s(g_sle_remote_addr.addr, sizeof(g_sle_remote_addr.addr), addr, 6);
     sle_connect_remote_device(&g_sle_remote_addr);
 }
@@ -136,15 +136,14 @@ static void sle_client_connect_state_changed_cbk(uint16_t conn_id, const sle_add
 {
     unused(addr);
     unused(pair_state);
-    osal_printk("%s conn state changed disc_reason:0x%x\r\n", SLE_CLIENT_LOG, disc_reason);
     g_sle_conn_id = conn_id;
     switch (conn_state)
     {
     case SLE_ACB_STATE_CONNECTED:
         osal_printk("%s SLE_ACB_STATE_CONNECTED\r\n", SLE_CLIENT_LOG);
-        osal_printk("%s LINK SERVER MAC ADDRESS %02X:%02X:%02X:%02X:%02X:%02X\r\n", SLE_CLIENT_LOG,
-                    addr->addr[0], addr->addr[1], addr->addr[2], addr->addr[3], addr->addr[4], addr->addr[5]);
+        sle_send_connect_done((uint8_t *)addr->addr);
         if (pair_state == SLE_PAIR_NONE) {
+            memcpy_s(g_sle_remote_addr.addr, sizeof(g_sle_remote_addr.addr), addr->addr, 6);
             sle_pair_remote_device(&g_sle_remote_addr);
         }
         break;
@@ -153,6 +152,8 @@ static void sle_client_connect_state_changed_cbk(uint16_t conn_id, const sle_add
         break;
     case SLE_ACB_STATE_DISCONNECTED:
         osal_printk("%s SLE_ACB_STATE_DISCONNECTED\r\n", SLE_CLIENT_LOG);
+        sle_send_disconnet_reason((uint8_t *)addr->addr, disc_reason);
+        memcpy_s(g_sle_remote_addr.addr, sizeof(g_sle_remote_addr.addr), addr->addr, 6);
         sle_remove_paired_remote_device(&g_sle_remote_addr);
         break;
     default:
