@@ -106,6 +106,10 @@ class uart:
         data = value.hex()
         if cmd == 0x0000:
             self._connect = True
+        elif cmd == 0x0001:
+            print("连接SLE设备成功，MAC:", data)
+        elif cmd == 0x0002:
+            print("SLE设备断开，MAC:", data[0:12], "原因：", data[12:14])
         elif cmd == 0x0003:
             Type = data[0:2]
             rssi = int(data[2:4], 16)   # RSSI
