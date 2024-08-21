@@ -27,13 +27,6 @@ static uint16_t rx_len = 0;
 static uint8_t PC_SN = 0;
 static uint8_t PICO_SN = 0;
 
-#define SLE_UART_TASK_STACK_SIZE            0x1200
-#define SLE_ADV_HANDLE_DEFAULT              1
-#define SLE_UART_MSG_QUEUE_LEN       5
-#define SLE_UART_MSG_QUEUE_MAX_SIZE  32
-#define SLE_UART_QUEUE_DELAY         0xFFFFFFFF
-#define SLE_UART_BUFF_MAX_SIZE       800
-
 static uint16_t CRC_Check(uint8_t *CRC_Ptr,uint8_t LEN)
 {
     uint16_t CRC_Value = 0;
@@ -137,7 +130,7 @@ void sle_send_connect_done(uint8_t *addr, uint8_t conn_id)
     send_buff[6] = 0x00;
     send_buff[7] = 0x01;
     send_buff[8] = 0x00;
-    send_buff[9] = 0x06;
+    send_buff[9] = 0x07;
     for (uint16_t i = 0; i < 6; i++) {
         send_buff[10 + i] = addr[i];
     }
@@ -169,7 +162,7 @@ void sle_send_disconnet_reason(uint8_t *addr, uint8_t dis_res)
     send_buff[6] = 0x00;
     send_buff[7] = 0x01;
     send_buff[8] = 0x00;
-    send_buff[9] = 0x06;
+    send_buff[9] = 0x07;
     for (uint16_t i = 0; i < 6; i++) {
         send_buff[10 + i] = addr[i];
     }
@@ -201,7 +194,7 @@ void sle_send_rssi_data(uint8_t conn_id, uint8_t rssi)
     send_buff[6] = 0x00;
     send_buff[7] = 0x04;
     send_buff[8] = 0x00;
-    send_buff[9] = 0x01;
+    send_buff[9] = 0x02;
     send_buff[10] = conn_id;
     send_buff[11] = rssi;
     uint16_t crc = CRC_Check(send_buff, 12);
@@ -263,7 +256,7 @@ void sle_send_property_data(uint8_t conn_id, uint16_t handle, uint8_t type)
     send_buff[6] = 0x00;
     send_buff[7] = 0x04;
     send_buff[8] = 0x00;
-    send_buff[9] = 0x01;
+    send_buff[9] = 0x04;
     send_buff[10] = conn_id;
     send_buff[11] = handle >> 8;
     send_buff[12] = handle & 0xFF;
