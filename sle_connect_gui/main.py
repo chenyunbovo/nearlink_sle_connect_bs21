@@ -18,7 +18,7 @@ from qfluentwidgets import (NavigationItemPosition, MessageBox, MSFluentTitleBar
 from qfluentwidgets import FluentIcon as FIF, FluentIcon
 from qframelesswindow import AcrylicWindow
 
-from app.SleGui.home_interface import CustomTitleBar, Widget, TabInterface, ScanWidget
+from home_interface import CustomTitleBar, Widget, TabInterface
 
 class MainWindow(MSFluentWindow):
 
@@ -27,7 +27,7 @@ class MainWindow(MSFluentWindow):
 
         super().__init__()
         self.setTitleBar(CustomTitleBar(self))
-        self.tabBar = self.titleBar.tabBar
+        self.tabBar:TabBar = self.titleBar.tabBar
 
         # create sub interface
         self.homeInterface = QStackedWidget(self, objectName='homeInterface')
@@ -49,14 +49,18 @@ class MainWindow(MSFluentWindow):
             position=NavigationItemPosition.BOTTOM,
         )
 
-        self.navigationInterface.setCurrentItem(
-            self.homeInterface.objectName())
+        self.navigationInterface.setCurrentItem(self.homeInterface.objectName())
 
-        tab = self.tabBar.addTab('scan', '扫描窗口', FluentIcon.SYNC)
+        tab = self.tabBar.addTab('扫描窗口', 'scan', FluentIcon.SYNC)
         tab.closeButton.hide()
-        self.scan_widget = ScanWidget(self)
+        self.scan_widget = TabInterface('扫描窗口', self)
         self.homeInterface.addWidget(self.scan_widget)
-        
+        self.scan_widget.create_scan_widget()
+        self.scan_widget.insert_item('test')
+        self.scan_widget.insert_item('test')
+        self.scan_widget.insert_item('test')
+        self.scan_widget.insert_item('test')
+        self.scan_widget.insert_item('test')
         self.tabBar.currentChanged.connect(self.onTabChanged)
         self.tabBar.tabAddRequested.connect(self.onTabAddRequested)
 
@@ -92,7 +96,7 @@ class MainWindow(MSFluentWindow):
 
     def addTab(self, routeKey, text, icon):
         self.tabBar.addTab(routeKey, text, icon)
-        self.homeInterface.addWidget(TabInterface(text, icon, routeKey, self))
+        self.homeInterface.addWidget(TabInterface(routeKey, self))
 
 
 class SLE:
