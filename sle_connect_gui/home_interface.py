@@ -1,7 +1,5 @@
-# coding:utf-8
 import sys
 import threading
-from uart import uart, uart_thread
 
 from PyQt5 import QtGui
 
@@ -14,30 +12,21 @@ from qfluentwidgets import (NavigationItemPosition, MessageBox, MSFluentTitleBar
                             TransparentDropDownToolButton, IndeterminateProgressRing, setTheme, TreeWidget)
 from qfluentwidgets import FluentIcon as FIF
 from qframelesswindow import AcrylicWindow
-
-class Widget(QFrame):
-    def __init__(self, text: str, parent=None):
-        super().__init__(parent=parent)
-        self.label = SubtitleLabel(text, self)
-        self.hBoxLayout = QHBoxLayout(self)
-
-        setFont(self.label, 24)
-        self.label.setAlignment(Qt.AlignCenter)
-        self.hBoxLayout.addWidget(self.label, 1, Qt.AlignCenter)
-        self.setObjectName(text.replace(' ', '-'))
+from device_interface import DevWidget
 
 class TabInterface(QFrame):
     def __init__(self, objectName, parent=None):
         super().__init__(parent=parent)
-
+        self.sle_entity = parent.sle_entity
         self.layout = QHBoxLayout(self)
         self.setObjectName(objectName)
+        self.create_scan_widget()
 
     def create_scan_widget(self):
         # 创建设备显示布局
         self.device_vbox = QVBoxLayout()
         self.device_vbox.setAlignment(Qt.AlignLeft)
-        self.device_vbox.addStretch(1)
+        self.device_vbox.addStretch(0)
 
         # 创建树形控件
         self.tree = TreeWidget(self)
@@ -71,9 +60,8 @@ class TabInterface(QFrame):
         self.layout.addLayout(self.button_vbox)
         self.layout.addStretch(1)
 
-
     def open_button_clicked(self):
-        if sle_entity.ut_thread == None:
+        if self.sle_entity.ut_thread == None:
             w = MessageBox(
                 '警告',
                 '请先打开串口再进行连接操作',
@@ -111,9 +99,11 @@ class TabInterface(QFrame):
             if MAC == None:
                 return
             
-            MAC = MAC.split(":")
-            mac = [i for i in map(lambda x: int(x, 16), MAC)]
-            sle_entity.ut.sle_connect_server(mac)
+            mac = [i for i in map(lambda x: int(x, 16), MAC.split(":"))]
+            
+            parent = self.parentWidget().parentWidget().parentWidget().parentWidget()
+            parent.addSubInterface(DevWidget(MAC,parent=parent), FIF.TAG, MAC, position=NavigationItemPosition.TOP)
+            self.sle_entity.ut.sle_connect_server(mac)
 
     def scan_done(self):
         self.scan_button.setText("扫描")
@@ -145,68 +135,3 @@ class TabInterface(QFrame):
 
     def clear_item(self):
         self.tree.clear()
-
-class SLE:
-    def __init__(self):
-        self.ut = uart()
-        self.ut_thread = None
-
-    def heartbeat_thread(self):
-        if self.ut._connect:
-            self.ut.sle_hearbeat()
-            self.ut._connect = False
-            threading.Timer(2, self.heartbeat_thread).start()
-        else:
-            self.stop_uart_thread()
-
-    def sle_scan_done(self):
-        self.ut.sle_scan_device(0)
-
-    def sle_start_scan(self):
-        self.ut.sle_scan_device(1)
-        threading.Timer(15, self.sle_scan_done).start()
-
-    def stop_uart_thread(self):
-        self.ut.close()
-        if self.ut_thread:
-            self.ut_thread.join()
-            self.ut_thread = None
-
-    def start_uart_thread(self,COM):
-        self.ut_thread = threading.Thread(target=uart_thread, args=(self.ut,COM))
-        self.ut_thread.start()
-        self.ut.sn_reset()
-        self.ut.sle_hearbeat()
-        threading.Timer(2.0, self.heartbeat_thread).start()
-        self.sle_start_scan()
-
-class CustomTitleBar(MSFluentTitleBar):
-    def __init__(self, parent):
-        super().__init__(parent)
-
-        self.tabBar = TabBar(self)
-
-        self.tabBar.setMovable(True)
-        self.tabBar.setTabMaximumWidth(220)
-        self.tabBar.setTabShadowEnabled(False)
-        self.tabBar.setTabSelectedBackgroundColor(QColor(255, 255, 255, 125), QColor(255, 255, 255, 50))
-
-        self.tabBar.tabCloseRequested.connect(self.tabBar.removeTab)
-        self.tabBar.currentChanged.connect(self.tabbar_changeed)
-
-        self.hBoxLayout.insertWidget(4, self.tabBar, 1)
-        self.hBoxLayout.setStretch(5, 0)
-        self.hBoxLayout.insertSpacing(6, 20)
-
-    def canDrag(self, pos: QPoint):
-        if not super().canDrag(pos):
-            return False
-
-        pos.setX(pos.x() - self.tabBar.x())
-        return not self.tabBar.tabRegion().contains(pos)
-    
-    def tabbar_changeed(self,index):
-        print(index)
-
-
-sle_entity = SLE()

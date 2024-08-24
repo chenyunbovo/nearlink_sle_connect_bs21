@@ -17,101 +17,90 @@ from qfluentwidgets import (NavigationItemPosition, MessageBox, MSFluentTitleBar
 from qfluentwidgets import FluentIcon as FIF, FluentIcon
 from qframelesswindow import AcrylicWindow
 
-from home_interface import CustomTitleBar, Widget, TabInterface
+from home_interface import TabInterface
+from log_interface import LogWidget
+from help_interface import HelpWidget
+from setting_interface import SetWidget
+from uart import uart, uart_thread
+
 
 class MainWindow(MSFluentWindow):
-
     def __init__(self):
         self.isMicaEnabled = False
-
         super().__init__()
-        self.setTitleBar(CustomTitleBar(self))
-        self.tabBar:TabBar = self.titleBar.tabBar
+
+        self.sle_entity = SLE(self)
 
         # create sub interface
         self.homeInterface = QStackedWidget(self, objectName='homeInterface')
-        self.logInterface = Widget('LOG Interface', self)
+        self.logInterface = LogWidget('LOG Interface', self)
+        self.helpInterface = HelpWidget('Help Interface', self)
+        self.settingInterface = SetWidget('Setting Interface', self)
 
         self.initNavigation()
         self.initWindow()
 
+    def removeSubInterface(self, interface):
+        self.navigationInterface.removeWidget(interface.objectName())
+
     def initNavigation(self):
         self.addSubInterface(self.homeInterface, FIF.HOME, '主页', FIF.HOME_FILL)
-        self.addSubInterface(self.logInterface, FIF.APPLICATION, '日志')
+        self.addSubInterface(self.logInterface, FIF.APPLICATION, '日志', position=NavigationItemPosition.BOTTOM)
+        self.addSubInterface(self.helpInterface, FIF.HELP, '帮助', position=NavigationItemPosition.BOTTOM)
+        self.addSubInterface(self.settingInterface, FIF.SETTING, '设置', position=NavigationItemPosition.BOTTOM)
 
-        self.navigationInterface.addItem(
-            routeKey='Help',
-            icon=FIF.HELP,
-            text='帮助',
-            onClick=self.showMessageBox,
-            selectable=False,
-            position=NavigationItemPosition.BOTTOM,
-        )
-
-        self.navigationInterface.setCurrentItem(self.homeInterface.objectName())
-
-        tab = self.tabBar.addTab('扫描窗口', 'scan', FluentIcon.SYNC)
-        tab.closeButton.hide()
         self.scan_widget = TabInterface('扫描窗口', self)
         self.homeInterface.addWidget(self.scan_widget)
-        self.scan_widget.create_scan_widget()
-        self.scan_widget.insert_item({
-            0x03: None,
-            0x0d: "0x01",
-            "RSSI": -50,
-            "MAC": "00:00:00:00:00:00",
-            'conn_id': None,
-            'handle': None,
-            'Type': None,
-            'connect': False,
-        })
-        self.scan_widget.insert_item({
-            0x03: "None",
-            0x0d: "0x01",
-            "RSSI": -50,
-            "MAC": "11:22:33:44:55:00",
-            'conn_id': None,
-            'handle': None,
-            'Type': None,
-            'connect': False,
-        })
-        self.tabBar.currentChanged.connect(self.onTabChanged)
-        self.tabBar.tabCloseRequested.connect(self.onTabCloseRequested)
-        self.tabBar.addButton.hide()
+        self.navigationInterface.setCurrentItem(self.homeInterface.objectName())
+
+    def set_title(self, title):
+        self.setWindowTitle(title)
 
     def initWindow(self):
         self.resize(500, 750)
         self.setWindowIcon(QIcon(':/qfluentwidgets/images/logo.png'))
-        self.setWindowTitle('SLE Connect')
+        self.set_title('SLE Connect（串口未连接）')
 
         desktop = QApplication.desktop().availableGeometry()
         w, h = desktop.width(), desktop.height()
         self.move(w//2 - self.width()//2, h//2 - self.height()//2)
 
-    def showMessageBox(self):
-        w = MessageBox(
-            '支持作者🥰',
-            '个人开发不易，如果这个项目帮助到了您，可以考虑请作者喝一瓶快乐水🥤。您的支持就是作者开发和维护项目的动力🚀',
-            self
-        )
-        w.yesButton.setText('来啦老弟')
-        w.cancelButton.setText('下次一定')
+class SLE:
+    def __init__(self,MainWin: MainWindow):
+        self.ut = uart()
+        self.Mainwin = MainWin
+        self.ut_thread = None
 
-        if w.exec():
-            print('谢谢支持')
+    def heartbeat_thread(self):
+        if self.ut._connect:
+            self.ut.sle_hearbeat()
+            self.ut._connect = False
+            threading.Timer(2, self.heartbeat_thread).start()
+        else:
+            self.stop_uart_thread()
 
-    def onTabCloseRequested(self, index: int):
-        print('onTabCloseRequested', index)
-        self.tabBar.removeTab(index)
+    def sle_scan_done(self):
+        self.ut.sle_scan_device(0)
 
-    def onTabChanged(self, index: int):
-        objectName = self.tabBar.currentTab().routeKey()
-        self.homeInterface.setCurrentWidget(self.findChild(TabInterface, objectName))
-        self.stackedWidget.setCurrentWidget(self.homeInterface)
+    def sle_start_scan(self):
+        self.ut.sle_scan_device(1)
+        threading.Timer(15, self.sle_scan_done).start()
 
-    def addTab(self, routeKey, text, icon):
-        self.tabBar.addTab(routeKey, text, icon)
-        self.homeInterface.addWidget(TabInterface(routeKey, self))
+    def stop_uart_thread(self):
+        self.ut.close()
+        if self.ut_thread:
+            self.ut_thread.join()
+            self.ut_thread = None
+        self.Mainwin.set_title('SLE Connect（串口未连接）')
+
+    def start_uart_thread(self,COM):
+        self.ut_thread = threading.Thread(target=uart_thread, args=(self.ut,COM))
+        self.ut_thread.start()
+        self.ut.sn_reset()
+        self.ut.sle_hearbeat()
+        threading.Timer(2.0, self.heartbeat_thread).start()
+        self.sle_start_scan()
+        self.Mainwin.set_title('SLE Connect（串口已连接）')
 
 if __name__ == '__main__':
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)               # 设置高DPI缩放因子舍入策略
