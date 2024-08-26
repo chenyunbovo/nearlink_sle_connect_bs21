@@ -78,18 +78,25 @@ class SLE:
         self.ut = uart()
         self.Mainwin = MainWin
         self.ut_thread = None
+        self.__heartbeat_count = 0
 
     def heartbeat_thread(self):
         if self.ut._connect:
             self.ut.sle_hearbeat()
             self.ut._connect = False
-            threading.Timer(2, self.heartbeat_thread).start()
-        else:
+            threading.Timer(30, self.heartbeat_thread).start()
+            self.__heartbeat_count = 0
+        elif self.__heartbeat_count > 3:
             self.stop_uart_thread()
+        else:
+            self.__heartbeat_count += 1
+            threading.Timer(1, self.heartbeat_thread).start()
 
     def sle_scan_done(self):
         self.ut.sle_scan_device(0)
         self.Mainwin.scan_widget.scan_done()
+
+    
 
     def sle_start_scan(self):
         self.ut.sle_scan_device(1)
@@ -114,7 +121,7 @@ class SLE:
         self.ut.sle_uart_data_clear()
         self.ut.sn_reset()
         self.ut.sle_hearbeat()
-        threading.Timer(2.0, self.heartbeat_thread).start()
+        threading.Timer(1.0, self.heartbeat_thread).start()
         self.sle_start_scan()
         self.Mainwin.main_signal.set_text("open")
         self.Mainwin.settingInterface.set_connect_button_text("断开")

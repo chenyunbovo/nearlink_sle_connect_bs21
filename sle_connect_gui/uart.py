@@ -43,7 +43,7 @@ class uart:
         self._PC_SN = 1
 
     def sle_hearbeat(self):
-        data = bytearray([0xFF, 0xFF, 0x00, 0x08, self._PC_SN, 0x02, 0x00, 0x00, 0x00, 0x00])
+        data = bytearray([0xFF, 0xFF, 0x00, 0x09, self._PC_SN, 0x02, 0x00, 0x00, 0x00, 0x01, 0x01])
         crc = CRC_Check(data, len(data))
         data.append(crc >> 8)
         data.append(crc & 0xFF)
@@ -145,7 +145,7 @@ class uart:
             else:
                 server_dic = {
                     0x03: None,
-                    0x0d: None,
+                    0x0b: None,
                     "RSSI": rssi,
                     "MAC": MAC,
                     'conn_id': None,
@@ -155,6 +155,7 @@ class uart:
                 }
                 server_dic[Type] = data
                 self._SLE_SERVER_LIST.append(server_dic)
+            print(self._SLE_SERVER_LIST)
         elif cmd == 0x0004:
             conn_id =  int(data[0:2], 16)
             rssi = int(data[2:4], 16)

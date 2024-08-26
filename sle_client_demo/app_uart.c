@@ -50,7 +50,7 @@ static uint16_t CRC_Check(uint8_t *CRC_Ptr,uint8_t LEN)
 
 void sle_send_heartbeat(void)
 {
-    uint16_t total_len  = 12;
+    uint16_t total_len  = 13;
     uint8_t *send_buff = (uint8_t *)osal_vmalloc(total_len);
     if (send_buff == NULL) {
         osal_printk("uart%d send data malloc fail!\r\n", USER_UART);
@@ -65,7 +65,8 @@ void sle_send_heartbeat(void)
     send_buff[6] = 0x00;
     send_buff[7] = 0x00;
     send_buff[8] = 0x00;
-    send_buff[9] = 0x00;
+    send_buff[9] = 0x01;
+    send_buff[10] = 0x01;
     uint16_t crc = CRC_Check(send_buff, total_len - 2);
     send_buff[total_len - 2] = crc >> 8;
     send_buff[total_len - 1] = crc & 0xFF;
@@ -273,7 +274,6 @@ void sle_send_property_data(uint8_t conn_id, uint16_t handle, uint8_t type)
 
 static void uart_cmd_parse(uint16_t cmd, uint16_t value_len, uint8_t *value)
 {
-    printf("uart receive data cmd: 0x%x\r\n", cmd);
     switch (cmd) {
     case SLE_HEARTBEAT_CMD:
         sle_send_heartbeat();
@@ -326,6 +326,7 @@ static void uart_data_handle(void)
                         for (uint8_t i = 6; i < len - 2;) {
                             uint16_t cmd = (g_app_uart_rx_buff[i] << 8) | g_app_uart_rx_buff[i + 1];
                             uint16_t value_len = (g_app_uart_rx_buff[i + 2] << 8) | g_app_uart_rx_buff[i + 3];
+                            printf("uart receive data cmd: 0x%x, value_len:%d\r\n", cmd, value_len);
                             uart_cmd_parse(cmd, value_len, &g_app_uart_rx_buff[i + 4]);
                             i += value_len + 4;
                         }
