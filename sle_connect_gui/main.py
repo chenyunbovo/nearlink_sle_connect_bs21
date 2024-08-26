@@ -1,21 +1,16 @@
 import threading
+import os
 import sys
 import serial
 import serial.tools.list_ports
-import inspect
-import ctypes
 from time import sleep
-from PyQt5 import QtGui
 
-from PyQt5.QtCore import Qt, QSize, QUrl, QPoint
-from PyQt5.QtGui import QIcon, QDesktopServices, QColor
+from PyQt5.QtCore import QThread,pyqtSignal,Qt
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QApplication, QFrame, QStackedWidget, QLabel
 
-from qfluentwidgets import (NavigationItemPosition, MessageBox, MSFluentTitleBar, MSFluentWindow,
-                            TabBar, SubtitleLabel, setFont, TabCloseButtonDisplayMode, IconWidget,
-                            TransparentDropDownToolButton, TransparentToolButton, setTheme, Theme, isDarkTheme)
+from qfluentwidgets import (NavigationItemPosition,FluentWindow)
 from qfluentwidgets import FluentIcon as FIF, FluentIcon
-from qframelesswindow import AcrylicWindow
 
 from home_interface import TabInterface
 from log_interface import LogWidget
@@ -23,13 +18,14 @@ from help_interface import HelpWidget
 from setting_interface import SetWidget
 from uart import uart, uart_thread
 
+path = os.path.dirname(os.path.abspath(__file__))
 
-class MainWindow(MSFluentWindow):
+class MainWindow(FluentWindow):
     def __init__(self):
-        self.isMicaEnabled = False
         super().__init__()
-
+        self.titleBar
         self.sle_entity = SLE(self)
+        self.navigationInterface.panel.setReturnButtonVisible(False)
 
         # create sub interface
         self.homeInterface = QStackedWidget(self, objectName='homeInterface')
@@ -37,14 +33,20 @@ class MainWindow(MSFluentWindow):
         self.helpInterface = HelpWidget('Help Interface', self)
         self.settingInterface = SetWidget('Setting Interface', self)
 
+        self.main_signal = SLE_SIGNAL()
+        self.main_signal.signal.connect(self.receive_main_signal)
+
         self.initNavigation()
         self.initWindow()
+
+    def receive_main_signal(self, text):
+        self.setWindowIcon(QIcon(path+"\\resources\\"+text+".png"))
 
     def removeSubInterface(self, interface):
         self.navigationInterface.removeWidget(interface.objectName())
 
     def initNavigation(self):
-        self.addSubInterface(self.homeInterface, FIF.HOME, '主页', FIF.HOME_FILL)
+        self.addSubInterface(self.homeInterface, FIF.HOME, '主页',position=NavigationItemPosition.TOP)
         self.addSubInterface(self.logInterface, FIF.APPLICATION, '日志', position=NavigationItemPosition.BOTTOM)
         self.addSubInterface(self.helpInterface, FIF.HELP, '帮助', position=NavigationItemPosition.BOTTOM)
         self.addSubInterface(self.settingInterface, FIF.SETTING, '设置', position=NavigationItemPosition.BOTTOM)
@@ -52,18 +54,24 @@ class MainWindow(MSFluentWindow):
         self.scan_widget = TabInterface('扫描窗口', self)
         self.homeInterface.addWidget(self.scan_widget)
         self.navigationInterface.setCurrentItem(self.homeInterface.objectName())
-
-    def set_title(self, title):
-        self.setWindowTitle(title)
-
+    
     def initWindow(self):
         self.resize(500, 750)
-        self.setWindowIcon(QIcon(':/qfluentwidgets/images/logo.png'))
-        self.set_title('SLE Connect（串口未连接）')
+        self.setWindowIcon(QIcon(path+"\\resources\\close.png"))
+        self.setWindowTitle('SLE Connect')
 
         desktop = QApplication.desktop().availableGeometry()
         w, h = desktop.width(), desktop.height()
         self.move(w//2 - self.width()//2, h//2 - self.height()//2)
+
+class SLE_SIGNAL(QThread):
+    signal = pyqtSignal(str)
+
+    def set_text(self,text):
+        self.text = text
+
+    def run(self):
+        self.signal.emit(self.text)
 
 class SLE:
     def __init__(self,MainWin: MainWindow):
@@ -81,6 +89,7 @@ class SLE:
 
     def sle_scan_done(self):
         self.ut.sle_scan_device(0)
+        self.Mainwin.scan_widget.scan_done()
 
     def sle_start_scan(self):
         self.ut.sle_scan_device(1)
@@ -91,16 +100,26 @@ class SLE:
         if self.ut_thread:
             self.ut_thread.join()
             self.ut_thread = None
-        self.Mainwin.set_title('SLE Connect（串口未连接）')
+        self.Mainwin.main_signal.set_text("close")
+        self.Mainwin.settingInterface.set_connect_button_text("连接")
+        self.Mainwin.main_signal.start()
+
+    def check_ut_thread(self):
+        if not self.ut_thread.is_alive():
+            self.stop_uart_thread()
 
     def start_uart_thread(self,COM):
         self.ut_thread = threading.Thread(target=uart_thread, args=(self.ut,COM))
         self.ut_thread.start()
+        self.ut.sle_uart_data_clear()
         self.ut.sn_reset()
         self.ut.sle_hearbeat()
         threading.Timer(2.0, self.heartbeat_thread).start()
         self.sle_start_scan()
-        self.Mainwin.set_title('SLE Connect（串口已连接）')
+        self.Mainwin.main_signal.set_text("open")
+        self.Mainwin.settingInterface.set_connect_button_text("断开")
+        self.Mainwin.main_signal.start()
+        threading.Timer(0.01,self.check_ut_thread).start()
 
 if __name__ == '__main__':
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)               # 设置高DPI缩放因子舍入策略

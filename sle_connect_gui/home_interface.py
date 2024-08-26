@@ -17,7 +17,8 @@ from device_interface import DevWidget
 class TabInterface(QFrame):
     def __init__(self, objectName, parent=None):
         super().__init__(parent=parent)
-        self.sle_entity = parent.sle_entity
+        from main import SLE
+        self.sle_entity:SLE = parent.sle_entity
         self.layout = QHBoxLayout(self)
         self.setObjectName(objectName)
         self.create_scan_widget()
@@ -110,16 +111,27 @@ class TabInterface(QFrame):
         self.spinner.hide()
 
     def scan_button_clicked(self):
-        if self.scan_button.text() == "取消扫描":
-            self.scan_timer.cancel()
-            self.scan_button.setText("扫描")
-            self.spinner.hide()
+        if self.sle_entity.ut_thread == None:
+            w = MessageBox(
+                '警告',
+                '请先打开串口再进行连接操作',
+                self
+            )
+            w.yesButton.setText('好的')
+            w.yesButton.setFixedSize(130, 35)
+            w.cancelButton.hide()
+            if w.exec():
+                return
         else:
-            self.clear_item()
-            self.scan_button.setText("取消扫描")
-            self.spinner.show()
-            self.scan_timer = threading.Timer(15, self.scan_done)
-            self.scan_timer.start()
+            if self.scan_button.text() == "取消扫描":
+                self.scan_button.setText("扫描")
+                self.spinner.hide()
+                self.sle_entity.sle_scan_done()
+            else:
+                self.clear_item()
+                self.scan_button.setText("取消扫描")
+                self.spinner.show()
+                self.sle_entity.sle_start_scan()
 
     def insert_item(self, sle_device:dict):
         item = QTreeWidgetItem([self.tr("MAC:"+sle_device["MAC"]+ "     RSSI:"+str(sle_device["RSSI"]))])

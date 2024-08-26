@@ -1,7 +1,5 @@
 import asyncio
 import serial_asyncio
-import threading
-import time
 
 def CRC_Check(CRC_Ptr, LEN):
     CRC_Value = 0xffff
@@ -27,7 +25,13 @@ class uart:
         self._connect = False
     
     async def open(self, port, baudrate):
-        self.reader, self.writer = await serial_asyncio.open_serial_connection(url=port, baudrate=baudrate)
+        try:
+            self.reader, self.writer = await serial_asyncio.open_serial_connection(url=port, baudrate=baudrate)
+        except Exception as e:
+            self.rec_task = None
+            self.write_task = None
+            print(e)
+            return
         self.rec_task = asyncio.create_task(self.read_from_serial(self.reader))
         self.write_task = asyncio.create_task(self.write(self.writer))
         tasks = [self.rec_task, self.write_task]
@@ -96,6 +100,9 @@ class uart:
             data[3] = (len(data) - 4) & 0xFF
             self.uart_send(data)
             self._PC_SN += 1
+
+    def sle_uart_data_clear(self):
+        self.data.clear()
 
     def uart_send(self, data):
         self.data.append(data)
@@ -218,8 +225,8 @@ class uart:
             await asyncio.sleep(0.2)
 
     def close(self):
-        self.writer.close()
         if self.write_task:
+            self.writer.close()
             self.write_task.cancel()
         if self.rec_task:
             self.rec_task.cancel()
