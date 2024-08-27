@@ -96,8 +96,6 @@ class SLE:
         self.ut.sle_scan_device(0)
         self.Mainwin.scan_widget.scan_done()
 
-    
-
     def sle_start_scan(self):
         self.ut.sle_scan_device(1)
         threading.Timer(15, self.sle_scan_done).start()

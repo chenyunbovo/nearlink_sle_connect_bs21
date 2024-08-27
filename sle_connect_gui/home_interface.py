@@ -1,6 +1,7 @@
 import sys
 import threading
 
+from time import sleep
 from PyQt5 import QtGui
 
 from PyQt5.QtCore import Qt, QSize, QUrl, QPoint
@@ -22,6 +23,18 @@ class TabInterface(QFrame):
         self.layout = QHBoxLayout(self)
         self.setObjectName(objectName)
         self.create_scan_widget()
+        self.sle_entity.ut_thread = 1
+        server_dic = {
+            0x03: None,
+            0x0b: None,
+            "RSSI": -50,
+            "MAC": "11:00:22:00:33:00",
+            'conn_id': None,
+            'handle': None,
+            'Type': None,
+            'connect': False,
+        }
+        self.insert_item(server_dic)
 
     def create_scan_widget(self):
         # 创建设备显示布局
@@ -109,6 +122,26 @@ class TabInterface(QFrame):
     def scan_done(self):
         self.scan_button.setText("扫描")
         self.spinner.hide()
+        self.sdh_thread.join()
+
+    def scan_data_handle_thread(self):
+        while self.spinner.isVisible():
+            for sle_device in self.sle_entity.ut._SLE_SERVER_LIST:
+                device_items = self.tree.findItems(sle_device["MAC"], Qt.MatchContains)
+                if len(device_items) == 0 :
+                    self.insert_item(sle_device)
+                else:
+                    device_item = device_items[0]
+                    device_item.setText(0, self.tr("MAC:"+sle_device["MAC"]+ "     RSSI:"+str(sle_device["RSSI"])))
+                    if sle_device[0x03] != None:
+                        device_item.child(0).child(0).setText(0, self.tr("DATA:"+sle_device[0x03]))
+                    else:
+                        device_item.child(0).child(0).setText(0, self.tr("DATA:"+"None"))
+                    if sle_device[0x0B] != None:
+                        device_item.child(1).child(0).setText(0, self.tr("DATA:"+sle_device[0x0B]))
+                    else:
+                        device_item.child(1).child(0).setText(0, self.tr("DATA:"+"None"))
+            sleep(0.2)
 
     def scan_button_clicked(self):
         if self.sle_entity.ut_thread == None:
@@ -127,11 +160,14 @@ class TabInterface(QFrame):
                 self.scan_button.setText("扫描")
                 self.spinner.hide()
                 self.sle_entity.sle_scan_done()
+                self.sdh_thread.join()
             else:
                 self.clear_item()
                 self.scan_button.setText("取消扫描")
                 self.spinner.show()
                 self.sle_entity.sle_start_scan()
+                self.sdh_thread = threading.Thread(target=self.scan_data_handle_thread)
+                self.sdh_thread.start()
 
     def insert_item(self, sle_device:dict):
         item = QTreeWidgetItem([self.tr("MAC:"+sle_device["MAC"]+ "     RSSI:"+str(sle_device["RSSI"]))])
@@ -139,9 +175,17 @@ class TabInterface(QFrame):
             child_item1 = QTreeWidgetItem([self.tr("TYPE:0x03")])
             child_item1.addChildren([QTreeWidgetItem([self.tr("DATA:"+sle_device[0x03])])])
             item.addChildren([child_item1,])
-        if sle_device[0x0D] != None:
+        else:
+            child_item1 = QTreeWidgetItem([self.tr("TYPE:0x03")])
+            child_item1.addChildren([QTreeWidgetItem([self.tr("DATA:"+"None")])])
+            item.addChildren([child_item1,])
+        if sle_device[0x0B] != None:
             child_item2 = QTreeWidgetItem([self.tr("TYPE:0x0D")])
-            child_item2.addChildren([QTreeWidgetItem([self.tr("DATA:"+sle_device[0x0D])])])
+            child_item2.addChildren([QTreeWidgetItem([self.tr("DATA:"+sle_device[0x0B])])])
+            item.addChildren([child_item2,])
+        else:
+            child_item2 = QTreeWidgetItem([self.tr("TYPE:0x0D")])
+            child_item2.addChildren([QTreeWidgetItem([self.tr("DATA:"+"None")])])
             item.addChildren([child_item2,])
         self.tree.addTopLevelItem(item)
 
