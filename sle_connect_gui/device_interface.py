@@ -20,7 +20,7 @@ class DevWidget(QFrame):
         self.mac = text
         self.scd_thread = threading.Thread(target=self.sle_connect_detecte_thread)
         self.scd_thread.start()
-        self.test()
+        # self.test()
 
     def test(self):
         for i in range(len(self.sle_entity.ut._SLE_SERVER_LIST)):
@@ -118,7 +118,9 @@ class DevWidget(QFrame):
     def close_button_clicked(self):
         parent = self.parentWidget().parentWidget().parentWidget()
         parent.removeSubInterface(self)
-        MAC = [i for i in map(lambda x: int(x, 16), self.mac.split(":"))]
+        MAC = []
+        for i in range(0,len(self.mac),2):
+            MAC.append(int(self.mac[i:i+2], 16))
         self.sle_entity.ut.sle_disconnect_server(MAC)
         self.scd_thread.join()
 

@@ -93,11 +93,12 @@ class uart:
             data[9] = (len(msg) + 4) & 0xFF
             for i in msg:
                 data.append(i)
+            data[2] = (len(data) - 2) >> 8
+            data[3] = (len(data) - 2) & 0xFF
             crc = CRC_Check(data, len(data))
             data.append(crc >> 8)
             data.append(crc & 0xFF)
-            data[2] = (len(data) - 4) >> 8
-            data[3] = (len(data) - 4) & 0xFF
+            
             self.uart_send(data)
             self._PC_SN += 1
 
@@ -105,7 +106,6 @@ class uart:
         self.data.clear()
 
     def uart_send(self, data):
-        print("send data:", data.hex())
         self.data.append(data)
 
     def __uart_cmd_parse(self, cmd, value_len, value):
@@ -137,7 +137,7 @@ class uart:
                 rssi -= 0x100
             MAC = data[4:16]
             data = data[16:]
-            print(f"扫描到SLE设备数据类型:{Type},RSSI:{rssi},MAC:{MAC},数据:{data}")
+            # print(f"扫描到SLE设备数据类型:{Type},RSSI:{rssi},MAC:{MAC},数据:{data}")
             for _ in self._SLE_SERVER_LIST:
                 if _['MAC'] == MAC:
                     _[Type] = data
@@ -156,7 +156,6 @@ class uart:
                 }
                 server_dic[Type] = data
                 self._SLE_SERVER_LIST.append(server_dic)
-            print(self._SLE_SERVER_LIST)
         elif cmd == 0x0004:
             conn_id =  int(data[0:2], 16)
             rssi = int(data[2:4], 16)
@@ -199,7 +198,7 @@ class uart:
                             i += value_len + 4
                         index += lenth + 4
                     else:
-                        print("serial data flag error!")
+                        # print("serial data flag error!")
                         index += 1
                 else:
                     print(f"CRC RECV:{crc:04x}")
@@ -208,7 +207,7 @@ class uart:
                     index += 1
             else:
                 index += 1
-                print("serial data head error!")
+                # print("serial data head error!")
 
     async def read_from_serial(self,reader):
         while True:

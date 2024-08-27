@@ -1,18 +1,14 @@
-import sys
 import threading
 
 from time import sleep
-from PyQt5 import QtGui
 
-from PyQt5.QtCore import Qt, QSize, QUrl, QPoint
-from PyQt5.QtGui import QIcon, QDesktopServices, QColor
+from PyQt5.QtCore import Qt, QSize, QThread,pyqtSignal
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QApplication, QFrame, QWidget, QTreeWidgetItem
 
 from qfluentwidgets import (NavigationItemPosition, MessageBox, MSFluentTitleBar, MSFluentWindow,
                             TabBar, SubtitleLabel, setFont, PrimaryPushButton, IconWidget,
                             TransparentDropDownToolButton, IndeterminateProgressRing, setTheme, TreeWidget)
 from qfluentwidgets import FluentIcon as FIF
-from qframelesswindow import AcrylicWindow
 from device_interface import DevWidget
 
 class TabInterface(QFrame):
@@ -23,6 +19,8 @@ class TabInterface(QFrame):
         self.layout = QHBoxLayout(self)
         self.setObjectName(objectName)
         self.create_scan_widget()
+        self.home_signal = HOME_SIGNAL()
+        self.home_signal.signal.connect(self.receive_home_signal)
         # self.sle_entity.ut_thread = 1
         # server_dic = {
         #     0x03: None,
@@ -105,17 +103,17 @@ class TabInterface(QFrame):
                     if("MAC" not in index.parent().parent().data()):
                         MAC = None
                     else:
-                        MAC = index.parent().parent().data()[4:21]
+                        MAC = index.parent().parent().data()[4:16]
                 else:
-                    MAC = index.parent().data()[4:21]
+                    MAC = index.parent().data()[4:16]
             else:
-                MAC = index.data()[4:21]
+                MAC = index.data()[4:16]
 
             if MAC == None:
                 return
-            
-            mac = [i for i in map(lambda x: int(x, 16), MAC.split(":"))]
-            
+            mac = []
+            for i in range(0,len(MAC),2):
+                mac.append(int(MAC[i:i+2], 16))
             parent = self.parentWidget().parentWidget().parentWidget().parentWidget()
             parent.addSubInterface(DevWidget(MAC,parent=parent), FIF.TAG, MAC, position=NavigationItemPosition.TOP)
             self.sle_entity.ut.sle_connect_server(mac)
@@ -123,25 +121,27 @@ class TabInterface(QFrame):
     def scan_done(self):
         self.scan_button.setText("扫描")
         self.spinner.hide()
-        self.sdh_thread.join()
+
+    def receive_home_signal(self,type):
+        for sle_device in self.sle_entity.ut._SLE_SERVER_LIST:
+            device_items = self.tree.findItems(sle_device["MAC"], Qt.MatchContains)
+            if len(device_items) == 0 :
+                self.insert_item(sle_device)
+            else:
+                device_item = device_items[0]
+                device_item.setText(0, self.tr("MAC:"+sle_device["MAC"]+ "     RSSI:"+str(sle_device["RSSI"])))
+                if sle_device[0x03] != None:
+                    device_item.child(0).child(0).setText(0, self.tr("DATA:"+sle_device[0x03]))
+                else:
+                    device_item.child(0).child(0).setText(0, self.tr("DATA:"+"None"))
+                if sle_device[0x0B] != None:
+                    device_item.child(1).child(0).setText(0, self.tr("DATA:"+sle_device[0x0B]))
+                else:
+                    device_item.child(1).child(0).setText(0, self.tr("DATA:"+"None"))
 
     def scan_data_handle_thread(self):
         while self.spinner.isVisible():
-            for sle_device in self.sle_entity.ut._SLE_SERVER_LIST:
-                device_items = self.tree.findItems(sle_device["MAC"], Qt.MatchContains)
-                if len(device_items) == 0 :
-                    self.insert_item(sle_device)
-                else:
-                    device_item = device_items[0]
-                    device_item.setText(0, self.tr("MAC:"+sle_device["MAC"]+ "     RSSI:"+str(sle_device["RSSI"])))
-                    if sle_device[0x03] != None:
-                        device_item.child(0).child(0).setText(0, self.tr("DATA:"+sle_device[0x03]))
-                    else:
-                        device_item.child(0).child(0).setText(0, self.tr("DATA:"+"None"))
-                    if sle_device[0x0B] != None:
-                        device_item.child(1).child(0).setText(0, self.tr("DATA:"+sle_device[0x0B]))
-                    else:
-                        device_item.child(1).child(0).setText(0, self.tr("DATA:"+"None"))
+            self.home_signal.start()
             sleep(0.2)
 
     def scan_button_clicked(self):
@@ -192,3 +192,10 @@ class TabInterface(QFrame):
 
     def clear_item(self):
         self.tree.clear()
+
+
+class HOME_SIGNAL(QThread):
+    signal = pyqtSignal(str)
+
+    def run(self):
+        self.signal.emit("home")

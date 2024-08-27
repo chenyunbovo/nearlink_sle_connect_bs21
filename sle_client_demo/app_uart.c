@@ -60,7 +60,7 @@ void sle_send_heartbeat(void)
     send_buff[1] = PROTOCOL_HEAD;
     send_buff[2] = (total_len - 4) >> 8;
     send_buff[3] = (total_len - 4) & 0xFF;
-    send_buff[4] = PICO_SN;
+    send_buff[4] = PC_SN;
     send_buff[5] = PICO_TO_PC_FLAG;
     send_buff[6] = 0x00;
     send_buff[7] = 0x00;
@@ -161,7 +161,7 @@ void sle_send_disconnet_reason(uint8_t *addr, uint8_t dis_res)
     send_buff[4] = PICO_SN;
     send_buff[5] = PICO_TO_PC_FLAG;
     send_buff[6] = 0x00;
-    send_buff[7] = 0x01;
+    send_buff[7] = 0x02;
     send_buff[8] = 0x00;
     send_buff[9] = 0x07;
     for (uint16_t i = 0; i < 6; i++) {
@@ -223,7 +223,7 @@ void sle_send_custom_data(uint8_t conn_id, uint8_t *data, uint16_t len)
     send_buff[4] = PICO_SN;
     send_buff[5] = PICO_TO_PC_FLAG;
     send_buff[6] = 0x00;
-    send_buff[7] = 0x03;
+    send_buff[7] = 0x05;
     send_buff[8] = len >> 8;
     send_buff[9] = len & 0xFF;
     send_buff[10] = conn_id;
@@ -255,14 +255,14 @@ void sle_send_property_data(uint8_t conn_id, uint16_t handle, uint8_t type)
     send_buff[4] = PICO_SN;
     send_buff[5] = PICO_TO_PC_FLAG;
     send_buff[6] = 0x00;
-    send_buff[7] = 0x04;
+    send_buff[7] = 0x06;
     send_buff[8] = 0x00;
     send_buff[9] = 0x04;
     send_buff[10] = conn_id;
     send_buff[11] = handle >> 8;
     send_buff[12] = handle & 0xFF;
     send_buff[13] = type;
-    uint16_t crc = CRC_Check(send_buff, 13);
+    uint16_t crc = CRC_Check(send_buff, 14);
     send_buff[14] = crc >> 8;
     send_buff[15] = crc & 0xFF;
     hal_uart_write(USER_UART, send_buff, total_len);

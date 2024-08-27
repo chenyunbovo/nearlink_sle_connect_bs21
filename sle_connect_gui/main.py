@@ -120,7 +120,6 @@ class SLE:
         self.ut.sn_reset()
         self.ut.sle_hearbeat()
         threading.Timer(1.0, self.heartbeat_thread).start()
-        self.sle_start_scan()
         self.Mainwin.main_signal.set_text("open")
         self.Mainwin.settingInterface.set_connect_button_text("断开")
         self.Mainwin.main_signal.start()
