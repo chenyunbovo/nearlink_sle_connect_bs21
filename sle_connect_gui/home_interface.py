@@ -23,18 +23,19 @@ class TabInterface(QFrame):
         self.layout = QHBoxLayout(self)
         self.setObjectName(objectName)
         self.create_scan_widget()
-        self.sle_entity.ut_thread = 1
-        server_dic = {
-            0x03: None,
-            0x0b: None,
-            "RSSI": -50,
-            "MAC": "11:00:22:00:33:00",
-            'conn_id': None,
-            'handle': None,
-            'Type': None,
-            'connect': False,
-        }
-        self.insert_item(server_dic)
+        # self.sle_entity.ut_thread = 1
+        # server_dic = {
+        #     0x03: None,
+        #     0x0b: None,
+        #     "RSSI": -50,
+        #     "MAC": "11:00:22:00:33:00",
+        #     'conn_id': None,
+        #     'handle': None,
+        #     'Type': None,
+        #     'connect': False,
+        # }
+        # self.insert_item(server_dic)
+        # self.sle_entity.ut._SLE_SERVER_LIST.append(server_dic)
 
     def create_scan_widget(self):
         # 创建设备显示布局
@@ -45,7 +46,7 @@ class TabInterface(QFrame):
         # 创建树形控件
         self.tree = TreeWidget(self)
         self.tree.setFixedSize(270, 700)
-        self.device_vbox.addWidget(self.tree,1, Qt.AlignTop)
+        self.device_vbox.addWidget(self.tree,0, Qt.AlignTop)
         self.tree.setHeaderHidden(True)
 
         # 创建按键布局
@@ -58,7 +59,7 @@ class TabInterface(QFrame):
         self.spinner.setFixedSize(30, 30)
         self.spinner.hide()
         
-        self.button_vbox.addWidget(self.spinner, 0, Qt.AlignCenter)
+        self.button_vbox.addWidget(self.spinner, 0, Qt.AlignTop|Qt.AlignHCenter)
         self.scan_button = PrimaryPushButton(FIF.SYNC, '扫描',self)
         self.scan_button.setFixedSize(150, 30)
         self.scan_button.clicked.connect(self.scan_button_clicked)
@@ -104,11 +105,11 @@ class TabInterface(QFrame):
                     if("MAC" not in index.parent().parent().data()):
                         MAC = None
                     else:
-                        MAC = index.parent().parent().data()[4:22]
+                        MAC = index.parent().parent().data()[4:21]
                 else:
-                    MAC = index.parent().data()[4:22]
+                    MAC = index.parent().data()[4:21]
             else:
-                MAC = index.data()[4:22]
+                MAC = index.data()[4:21]
 
             if MAC == None:
                 return

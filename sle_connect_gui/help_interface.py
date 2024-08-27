@@ -1,19 +1,7 @@
-# coding:utf-8
-import sys
-import threading
-from uart import uart, uart_thread
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QHBoxLayout, QFrame
 
-from PyQt5 import QtGui
-
-from PyQt5.QtCore import Qt, QSize, QUrl, QPoint
-from PyQt5.QtGui import QIcon, QDesktopServices, QColor
-from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QApplication, QFrame, QWidget, QTreeWidgetItem
-
-from qfluentwidgets import (NavigationItemPosition, MessageBox, MSFluentTitleBar, MSFluentWindow,
-                            TabBar, SubtitleLabel, setFont, PrimaryPushButton, IconWidget,
-                            TransparentDropDownToolButton, IndeterminateProgressRing, setTheme, TreeWidget)
-from qfluentwidgets import FluentIcon as FIF
-from qframelesswindow import AcrylicWindow
+from qfluentwidgets import (SubtitleLabel, setFont)
 
 class HelpWidget(QFrame):
     def __init__(self, text: str, parent=None):

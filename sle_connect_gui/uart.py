@@ -105,6 +105,7 @@ class uart:
         self.data.clear()
 
     def uart_send(self, data):
+        print("send data:", data.hex())
         self.data.append(data)
 
     def __uart_cmd_parse(self, cmd, value_len, value):
