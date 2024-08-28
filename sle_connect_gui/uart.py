@@ -15,14 +15,16 @@ def CRC_Check(CRC_Ptr, LEN):
     return CRC_Value & 0xFFFF
 
 class uart:
-    def __init__(self):
+    def __init__(self, sle_rec_data_cb):
         self.port = None
         self._PC_SN = 1
         self._SLE_SERVER_LIST = []
         self.data = []
+        self.sle_rec_data_cb = sle_rec_data_cb
         self.writer = None
         self.close_flag = False
         self._connect = False
+        self.__last_data = None
     
     async def open(self, port, baudrate):
         try:
@@ -98,7 +100,6 @@ class uart:
             crc = CRC_Check(data, len(data))
             data.append(crc >> 8)
             data.append(crc & 0xFF)
-            
             self.uart_send(data)
             self._PC_SN += 1
 
@@ -107,6 +108,7 @@ class uart:
 
     def uart_send(self, data):
         self.data.append(data)
+        print("send data:", data.hex())
 
     def __uart_cmd_parse(self, cmd, value_len, value):
         data = value.hex()
@@ -168,7 +170,13 @@ class uart:
         elif cmd == 0x0005:
             conn_id = int(data[0:2], 16)
             msg = data[2:]
-            print(f"收到SLE设备数据：conn_id:{conn_id},数据：{msg}")
+            mac = ''
+            for _ in self._SLE_SERVER_LIST:
+                if _['conn_id'] == conn_id:
+                    mac = _['MAC']
+                    self.sle_send_data_cb(mac, msg)
+                    break
+            print(f"收到SLE设备数据：mac:{mac},conn_id:{conn_id},数据：{msg}")
         elif cmd == 0x0006:
             conn_id = int(data[0:2], 16)
             handle = int(data[2:6], 16)
@@ -182,10 +190,19 @@ class uart:
 
     def __uart_recv_data_handle(self, data):
         print("recv data:", data.hex())
+        if self.__last_data != None:
+            data = self.__last_data + data
+            self.__last_data = None
         index = 0
-        while index < len(data) - 8:
+        while index < len(data):
+            if index >= len(data) - 4:
+                self.__last_data = data[index:]
+                break
             if data[index] == 0xFF and data[index+1] == 0xFF:
                 lenth = data[index+2] << 8 | data[index+3]
+                if lenth > len(data) - index - 4:
+                    self.__last_data = data[index:]
+                    break
                 crc = data[index + lenth + 2] << 8 | data[index + lenth + 3]
                 if crc == CRC_Check(data[index:index + lenth + 2], lenth + 2):
                     flag = data[index+5]
@@ -213,6 +230,7 @@ class uart:
         while True:
             data = await reader.read(1000)
             try:
+
                 self.__uart_recv_data_handle(data)
             except Exception as e:
                 print(e)
@@ -220,7 +238,6 @@ class uart:
     async def write(self, writer):
         while True:
             if len(self.data) > 0:
-                print("send data:", self.data[0].hex())
                 writer.write(self.data.pop(0))
                 await writer.drain()
             await asyncio.sleep(0.2)

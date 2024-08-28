@@ -41,6 +41,10 @@ class MainWindow(FluentWindow):
 
     def receive_main_signal(self, text):
         self.setWindowIcon(QIcon(path+"\\resources\\"+text+".png"))
+        if text == "close":
+            self.settingInterface.set_connect_button_text("连接")
+        else:
+            self.settingInterface.set_connect_button_text("断开")
 
     def removeSubInterface(self, interface):
         self.navigationInterface.removeWidget(interface.objectName())
@@ -64,6 +68,11 @@ class MainWindow(FluentWindow):
         w, h = desktop.width(), desktop.height()
         self.move(w//2 - self.width()//2, h//2 - self.height()//2)
 
+    def closeEvent(self, event):
+        for _ in self.stackedWidget.view.children():
+            if hasattr(_, 'stop_thread'):
+                _.stop_thread()
+
 class SLE_SIGNAL(QThread):
     signal = pyqtSignal(str)
 
@@ -75,10 +84,16 @@ class SLE_SIGNAL(QThread):
 
 class SLE:
     def __init__(self,MainWin: MainWindow):
-        self.ut = uart()
+        self.ut = uart(self.sle_rec_data_cb)
         self.Mainwin = MainWin
         self.ut_thread = None
         self.__heartbeat_count = 0
+
+    def sle_rec_data_cb(self,mac,data):
+        for _ in self.Mainwin.stackedWidget.view.children():
+            if _.objectName() == mac:
+                _.text_edit_append('收<-'+data)
+                break
 
     def heartbeat_thread(self):
         if self.ut._connect:
@@ -106,7 +121,6 @@ class SLE:
             self.ut_thread.join()
             self.ut_thread = None
         self.Mainwin.main_signal.set_text("close")
-        self.Mainwin.settingInterface.set_connect_button_text("连接")
         self.Mainwin.main_signal.start()
 
     def check_ut_thread(self):
@@ -121,7 +135,6 @@ class SLE:
         self.ut.sle_hearbeat()
         threading.Timer(1.0, self.heartbeat_thread).start()
         self.Mainwin.main_signal.set_text("open")
-        self.Mainwin.settingInterface.set_connect_button_text("断开")
         self.Mainwin.main_signal.start()
         threading.Timer(0.01,self.check_ut_thread).start()
 

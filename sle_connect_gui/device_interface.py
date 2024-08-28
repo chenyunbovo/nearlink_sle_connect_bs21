@@ -1,10 +1,11 @@
 import threading
 from time import sleep
+import datetime
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt,QThread,pyqtSignal
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QFrame, QButtonGroup
 
-from qfluentwidgets import (QColor,TextEdit, PrimaryPushButton,IndeterminateProgressRing, SubtitleLabel, LineEdit, RadioButton)
+from qfluentwidgets import (QColor,TextEdit,MessageBox, PrimaryPushButton,IndeterminateProgressRing, SubtitleLabel, LineEdit, RadioButton)
 from qfluentwidgets import FluentIcon as FIF
 
 class DevWidget(QFrame):
@@ -12,20 +13,33 @@ class DevWidget(QFrame):
         super().__init__(parent=parent)
         from main import SLE
         self.sle_entity:SLE = parent.sle_entity
+        self.dev_signal = DEV_SIGNAL()
+        self.dev_signal.signal.connect(self.receive_dev_signal)
         self.hBoxLayout = QVBoxLayout(self)
         self.setObjectName(text)
         self.initWdiget()
         self.initConnWidget()
         self.create_button()
         self.mac = text
+        self.scd_thread_flag = 1
         self.scd_thread = threading.Thread(target=self.sle_connect_detecte_thread)
         self.scd_thread.start()
-        # self.test()
+        self.test()
 
     def test(self):
         for i in range(len(self.sle_entity.ut._SLE_SERVER_LIST)):
             if self.sle_entity.ut._SLE_SERVER_LIST[i]['MAC'] == self.mac:
                 self.sle_entity.ut._SLE_SERVER_LIST[i]['connect'] = True
+
+    def receive_dev_signal(self, text):
+        for device in self.sle_entity.ut._SLE_SERVER_LIST:
+            if device['MAC'] == self.mac:
+                if device['connect']:
+                    self.spinner.hide()
+                    self.connWidge_show()
+                else:
+                    self.spinner.show()
+                    self.connWidge_hide()
 
     def initWdiget(self):
         self.spinner = IndeterminateProgressRing(self)
@@ -38,7 +52,7 @@ class DevWidget(QFrame):
         self.text_label.setFixedSize(100, 30)
         self.hBoxLayout.addWidget(self.text_label, 0, Qt.AlignTop|Qt.AlignCenter)
         self.text_edit = TextEdit(self)
-        self.text_edit.setFixedSize(425, 230)
+        self.text_edit.setFixedSize(425, 400)
         self.hBoxLayout.addWidget(self.text_edit, 0, Qt.AlignCenter)
 
         self.user_input_label = SubtitleLabel('用户输入', self)        
@@ -49,6 +63,7 @@ class DevWidget(QFrame):
         self.user_edit = LineEdit(self)
         self.user_edit.setFixedSize(425, 45)
         self.hBoxLayout.addWidget(self.user_edit, 0, Qt.AlignCenter)
+        self.user_edit.textEdited.connect(self.user_edit_text_cb)
 
         self.send_layout = QHBoxLayout()
         self.hBoxLayout.addLayout(self.send_layout)
@@ -57,13 +72,19 @@ class DevWidget(QFrame):
         self.ascii_button.setFixedSize(60, 30)
         self.send_layout.addWidget(self.ascii_button, 0, Qt.AlignLeft)
 
+        self.ascii_text = ''
+
         self.hex_button = RadioButton('HEX', self)
         self.hex_button.setFixedSize(60, 30)
         self.send_layout.addWidget(self.hex_button, 0, Qt.AlignLeft)
 
+        self.hex_text = ''
+        self.last_button = 'ASCII'
+
         self.button_group = QButtonGroup(self)
         self.button_group.addButton(self.ascii_button)
         self.button_group.addButton(self.hex_button)
+        self.button_group.buttonClicked.connect(self.radio_button_clicked)
         self.ascii_button.setChecked(True)
 
         self.user_send_button = PrimaryPushButton(FIF.SEND, '发送', self)
@@ -73,20 +94,51 @@ class DevWidget(QFrame):
 
         self.connWidge_hide()
 
+    def user_edit_text_cb(self, text):
+        if self.get_button_group_selected() == 'HEX':
+            if len(text) != 0:
+                if text[-1] not in '0123456789ABCDEFabcdef ':
+                    w = MessageBox(
+                        '警告',
+                        '不是有效HEX字符组合("0-9","A-F","a-f"," ")!',
+                        self
+                    )
+                    w.yesButton.setText('好的')
+                    w.yesButton.setFixedSize(130, 35)
+                    w.cancelButton.hide()
+                    if w.exec():
+                        self.user_edit.setText(text[:-1])
+                        return
+
+    def radio_button_clicked(self, obj):
+        if obj.text() == 'ASCII' and self.last_button == 'HEX':
+            self.last_button = 'ASCII'
+            self.hex_text = self.user_edit.text()
+            self.user_edit.setText(self.ascii_text)
+        elif obj.text() == 'HEX' and self.last_button == 'ASCII':
+            self.last_button = 'HEX'
+            self.ascii_text = self.user_edit.text()
+            self.user_edit.setText(self.hex_text)
+
     def get_button_group_selected(self):
         return self.button_group.checkedButton().text()
 
     def user_send_button_clicked(self):
         if self.get_button_group_selected() == 'ASCII':
+            self.text_edit_append('发->'+self.user_edit.text())
             data = [ord(i) for i in self.user_edit.text()]
         else:
             data = []
+            send_source = ''
             text = self.user_edit.text().replace(' ', '')
             for _ in range(0,len(text),2):
                 if _ == len(text) - 1:
                     data.append(int(text[_], 16))
+                    send_source +=' ' + hex(int(text[_], 16))
                     break
                 data.append(int(self.user_edit.text().replace(' ', '')[_:_+2], 16))
+                send_source +=' ' + hex(int(self.user_edit.text().replace(' ', '')[_:_+2], 16))
+            self.text_edit_append('发->'+send_source)
         for i in range(len(self.sle_entity.ut._SLE_SERVER_LIST)):
             if self.sle_entity.ut._SLE_SERVER_LIST[i]['MAC'] == self.mac:
                 self.sle_entity.ut.sle_send_data(self.sle_entity.ut._SLE_SERVER_LIST[i]['conn_id'],self.sle_entity.ut._SLE_SERVER_LIST[i]['handle'],self.sle_entity.ut._SLE_SERVER_LIST[i]['Type'],data)
@@ -122,16 +174,24 @@ class DevWidget(QFrame):
         for i in range(0,len(self.mac),2):
             MAC.append(int(self.mac[i:i+2], 16))
         self.sle_entity.ut.sle_disconnect_server(MAC)
-        self.scd_thread.join()
+        self.stop_thread()
 
     def sle_connect_detecte_thread(self):
-        while self.sle_entity.ut_thread:
-            for device in self.sle_entity.ut._SLE_SERVER_LIST:
-                if device['MAC'] == self.mac:
-                    if device['connect']:
-                        self.spinner.hide()
-                        self.connWidge_show()
-                    else:
-                        self.spinner.show()
-                        self.connWidge_hide()
+        while self.sle_entity.ut_thread and self.scd_thread_flag:
+            self.dev_signal.start()
             sleep(1)
+
+    def text_edit_append(self, text):
+        now = datetime.datetime.now()
+        now = now.strftime('%Y-%m-%d %H:%M:%S')
+        text = f"{now} : {text}"
+        self.text_edit.append(text)
+
+    def stop_thread(self):
+        self.scd_thread_flag = 0
+
+class DEV_SIGNAL(QThread):
+    signal = pyqtSignal(str)
+
+    def run(self):
+        self.signal.emit("dev")

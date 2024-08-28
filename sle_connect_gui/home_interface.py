@@ -21,38 +21,34 @@ class TabInterface(QFrame):
         self.create_scan_widget()
         self.home_signal = HOME_SIGNAL()
         self.home_signal.signal.connect(self.receive_home_signal)
-        # self.sle_entity.ut_thread = 1
-        # server_dic = {
-        #     0x03: None,
-        #     0x0b: None,
-        #     "RSSI": -50,
-        #     "MAC": "11:00:22:00:33:00",
-        #     'conn_id': None,
-        #     'handle': None,
-        #     'Type': None,
-        #     'connect': False,
-        # }
-        # self.insert_item(server_dic)
-        # self.sle_entity.ut._SLE_SERVER_LIST.append(server_dic)
+        self.sle_entity.ut_thread = 1
+        server_dic = {
+            0x03: None,
+            0x0b: None,
+            "RSSI": -50,
+            "MAC": "110022003300",
+            'conn_id': 0x00,
+            'handle': 0x0003,
+            'Type': 0x00,
+            'connect': False,
+        }
+        self.insert_item(server_dic)
+        self.sle_entity.ut._SLE_SERVER_LIST.append(server_dic)
 
     def create_scan_widget(self):
-        # 创建设备显示布局
         self.device_vbox = QVBoxLayout()
         self.device_vbox.setAlignment(Qt.AlignLeft)
         self.device_vbox.addStretch(0)
 
-        # 创建树形控件
         self.tree = TreeWidget(self)
         self.tree.setFixedSize(270, 700)
         self.device_vbox.addWidget(self.tree,0, Qt.AlignTop)
         self.tree.setHeaderHidden(True)
 
-        # 创建按键布局
         self.button_vbox = QVBoxLayout()
         self.button_vbox.setAlignment(Qt.AlignTop)
         self.button_vbox.addStretch(0)
 
-        # 创建按键
         self.spinner = IndeterminateProgressRing(self)
         self.spinner.setFixedSize(30, 30)
         self.spinner.hide()
@@ -68,7 +64,6 @@ class TabInterface(QFrame):
         self.open_button.clicked.connect(self.open_button_clicked)
         self.button_vbox.addWidget(self.open_button, 1, Qt.AlignTop)
         
-        # 添加布局
         self.layout.addLayout(self.device_vbox)
         self.layout.addLayout(self.button_vbox)
         self.layout.addStretch(1)
