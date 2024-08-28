@@ -224,8 +224,8 @@ void sle_send_custom_data(uint8_t conn_id, uint8_t *data, uint16_t len)
     send_buff[5] = PICO_TO_PC_FLAG;
     send_buff[6] = 0x00;
     send_buff[7] = 0x05;
-    send_buff[8] = len >> 8;
-    send_buff[9] = len & 0xFF;
+    send_buff[8] = (len + 1) >> 8;
+    send_buff[9] = (len + 1) & 0xFF;
     send_buff[10] = conn_id;
     for (uint16_t i = 0; i < len; i++) {
         send_buff[11 + i] = data[i];

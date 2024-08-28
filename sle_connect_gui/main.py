@@ -6,7 +6,7 @@ import serial.tools.list_ports
 from time import sleep
 
 from PyQt5.QtCore import QThread,pyqtSignal,Qt
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon,QFont
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QApplication, QFrame, QStackedWidget, QLabel
 
 from qfluentwidgets import (NavigationItemPosition,FluentWindow)
@@ -82,9 +82,14 @@ class SLE_SIGNAL(QThread):
     def run(self):
         self.signal.emit(self.text)
 
+def hex_to_chinese(hex_str):
+    bytes_data = bytes.fromhex(hex_str)
+    chinese_str = bytes_data.decode('gb2312')
+    return chinese_str
+
 class SLE:
     def __init__(self,MainWin: MainWindow):
-        self.ut = uart(self.sle_rec_data_cb)
+        self.ut = uart(self)
         self.Mainwin = MainWin
         self.ut_thread = None
         self.__heartbeat_count = 0
@@ -92,7 +97,19 @@ class SLE:
     def sle_rec_data_cb(self,mac,data):
         for _ in self.Mainwin.stackedWidget.view.children():
             if _.objectName() == mac:
-                _.text_edit_append('收<-'+data)
+                if _.get_button_group_selected() == 'ASCII':
+                    data_list = []
+                    for i in range(0,len(data),2):
+                        data_list.append(int(data[i:i+2], 16))
+                    try:
+                        hex_str = ''.join([format(i, '02x') for i in data_list])
+                        bytes_data = bytes.fromhex(hex_str)
+                        data = bytes_data.decode('gb2312')
+                    except TypeError:
+                        data = ''.join([chr(i) for i in data_list])
+                    _.text_edit_append('收<-'+data)
+                else:
+                    _.text_edit_append('收<-'+data)
                 break
 
     def heartbeat_thread(self):
@@ -143,6 +160,8 @@ if __name__ == '__main__':
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)                                                           # 启用高DPI缩放
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)                                                              # 使用高DPI图标
     app = QApplication(sys.argv)
+    default_font = QFont("Arial", 10)
+    app.setFont(default_font)
     app.setAttribute(Qt.AA_DontCreateNativeWidgetSiblings)                                                         # 不创建本地窗口小部件兄弟
     w = MainWindow()
     w.show()

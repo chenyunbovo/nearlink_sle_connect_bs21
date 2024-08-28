@@ -15,12 +15,12 @@ def CRC_Check(CRC_Ptr, LEN):
     return CRC_Value & 0xFFFF
 
 class uart:
-    def __init__(self, sle_rec_data_cb):
+    def __init__(self, SLE):
         self.port = None
         self._PC_SN = 1
         self._SLE_SERVER_LIST = []
         self.data = []
-        self.sle_rec_data_cb = sle_rec_data_cb
+        self.SLE = SLE
         self.writer = None
         self.close_flag = False
         self._connect = False
@@ -174,7 +174,7 @@ class uart:
             for _ in self._SLE_SERVER_LIST:
                 if _['conn_id'] == conn_id:
                     mac = _['MAC']
-                    self.sle_send_data_cb(mac, msg)
+                    self.SLE.sle_rec_data_cb(mac, msg)
                     break
             print(f"收到SLE设备数据：mac:{mac},conn_id:{conn_id},数据：{msg}")
         elif cmd == 0x0006:

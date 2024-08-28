@@ -21,19 +21,19 @@ class TabInterface(QFrame):
         self.create_scan_widget()
         self.home_signal = HOME_SIGNAL()
         self.home_signal.signal.connect(self.receive_home_signal)
-        self.sle_entity.ut_thread = 1
-        server_dic = {
-            0x03: None,
-            0x0b: None,
-            "RSSI": -50,
-            "MAC": "110022003300",
-            'conn_id': 0x00,
-            'handle': 0x0003,
-            'Type': 0x00,
-            'connect': False,
-        }
-        self.insert_item(server_dic)
-        self.sle_entity.ut._SLE_SERVER_LIST.append(server_dic)
+        # self.sle_entity.ut_thread = 1
+        # server_dic = {
+        #     0x03: None,
+        #     0x0b: None,
+        #     "RSSI": -50,
+        #     "MAC": "110022003300",
+        #     'conn_id': 0x00,
+        #     'handle': 0x0003,
+        #     'Type': 0x00,
+        #     'connect': False,
+        # }
+        # self.insert_item(server_dic)
+        # self.sle_entity.ut._SLE_SERVER_LIST.append(server_dic)
 
     def create_scan_widget(self):
         self.device_vbox = QVBoxLayout()

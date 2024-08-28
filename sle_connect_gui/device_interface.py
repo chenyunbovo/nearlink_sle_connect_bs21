@@ -15,6 +15,7 @@ class DevWidget(QFrame):
         self.sle_entity:SLE = parent.sle_entity
         self.dev_signal = DEV_SIGNAL()
         self.dev_signal.signal.connect(self.receive_dev_signal)
+        self.dev_signal.text_edit_signal.connect(self.text_edit_append_cb)
         self.hBoxLayout = QVBoxLayout(self)
         self.setObjectName(text)
         self.initWdiget()
@@ -24,7 +25,7 @@ class DevWidget(QFrame):
         self.scd_thread_flag = 1
         self.scd_thread = threading.Thread(target=self.sle_connect_detecte_thread)
         self.scd_thread.start()
-        self.test()
+        # self.test()
 
     def test(self):
         for i in range(len(self.sle_entity.ut._SLE_SERVER_LIST)):
@@ -125,8 +126,11 @@ class DevWidget(QFrame):
 
     def user_send_button_clicked(self):
         if self.get_button_group_selected() == 'ASCII':
-            self.text_edit_append('发->'+self.user_edit.text())
-            data = [ord(i) for i in self.user_edit.text()]
+            try:
+                data = self.user_edit.text().encode('gb2312')
+                self.text_edit_append('发->'+self.user_edit.text())
+            except Exception as e:
+                print(e)
         else:
             data = []
             send_source = ''
@@ -175,23 +179,35 @@ class DevWidget(QFrame):
             MAC.append(int(self.mac[i:i+2], 16))
         self.sle_entity.ut.sle_disconnect_server(MAC)
         self.stop_thread()
+        self.close()
 
     def sle_connect_detecte_thread(self):
         while self.sle_entity.ut_thread and self.scd_thread_flag:
+            self.dev_signal.set_text('dev')
             self.dev_signal.start()
             sleep(1)
 
-    def text_edit_append(self, text):
-        now = datetime.datetime.now()
-        now = now.strftime('%Y-%m-%d %H:%M:%S')
-        text = f"{now} : {text}"
+    def text_edit_append_cb(self, text):
         self.text_edit.append(text)
+
+    def text_edit_append(self, text):
+        now = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
+        text = f"[{now}]{text}"
+        self.dev_signal.set_text(text)
+        self.dev_signal.start()
 
     def stop_thread(self):
         self.scd_thread_flag = 0
 
 class DEV_SIGNAL(QThread):
     signal = pyqtSignal(str)
+    text_edit_signal = pyqtSignal(str)
+
+    def set_text(self,text):
+        self.text = text
 
     def run(self):
-        self.signal.emit("dev")
+        if self.text == 'dev':
+            self.signal.emit("dev")
+        else:
+            self.text_edit_signal.emit(self.text)
