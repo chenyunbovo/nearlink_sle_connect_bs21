@@ -24,7 +24,6 @@ path = os.path.dirname(os.path.abspath(__file__))
 class MainWindow(FluentWindow):
     def __init__(self):
         super().__init__()
-        self.sle_logger = logging.getLogger('sle_logger')
         self.sle_entity = SLE(self)
         self.navigationInterface.panel.setReturnButtonVisible(False)
 
@@ -36,9 +35,11 @@ class MainWindow(FluentWindow):
 
         self.main_signal = SLE_SIGNAL()
         self.main_signal.signal.connect(self.receive_main_signal)
-        self.sle_logger.info('MainWindow init')
+        
+        self.sle_logger = logging.getLogger('sle_logger')
         self.initNavigation()
         self.initWindow()
+        self.sle_logger.info('MainWindow init Success!')
 
     def receive_main_signal(self, text):
         self.setWindowIcon(QIcon(path+"\\resources\\"+text+".png"))
@@ -73,6 +74,7 @@ class MainWindow(FluentWindow):
         for _ in self.stackedWidget.view.children():
             if hasattr(_, 'stop_thread'):
                 _.stop_thread()
+        self.sle_logger.info('MainWindow close Success!')
 
 class SLE_SIGNAL(QThread):
     signal = pyqtSignal(str)
@@ -83,17 +85,14 @@ class SLE_SIGNAL(QThread):
     def run(self):
         self.signal.emit(self.text)
 
-def hex_to_chinese(hex_str):
-    bytes_data = bytes.fromhex(hex_str)
-    chinese_str = bytes_data.decode('gb2312')
-    return chinese_str
-
 class SLE:
     def __init__(self,MainWin: MainWindow):
+        self.sle_logger = logging.getLogger('sle_logger')
         self.ut = uart(self)
         self.Mainwin = MainWin
         self.ut_thread = None
         self.__heartbeat_count = 0
+        self.sle_logger.info('SLE init Success!')
 
     def sle_rec_data_cb(self,mac,data):
         for _ in self.Mainwin.stackedWidget.view.children():
@@ -119,17 +118,22 @@ class SLE:
             self.ut._connect = False
             threading.Timer(30, self.heartbeat_thread).start()
             self.__heartbeat_count = 0
-        elif self.__heartbeat_count > 3:
+        elif self.__heartbeat_count > 2:
+            self.__heartbeat_count = 0
+            self.sle_logger.info('SLE ')
             self.stop_uart_thread()
         else:
             self.__heartbeat_count += 1
+            self.ut.sle_hearbeat()
             threading.Timer(1, self.heartbeat_thread).start()
 
     def sle_scan_done(self):
+        self.sle_logger.info('SLE scan done')
         self.ut.sle_scan_device(0)
         self.Mainwin.scan_widget.scan_done()
 
     def sle_start_scan(self):
+        self.sle_logger.info('SLE start scan')
         self.ut.sle_scan_device(1)
         threading.Timer(15, self.sle_scan_done).start()
 
@@ -142,15 +146,17 @@ class SLE:
         self.Mainwin.main_signal.start()
 
     def check_ut_thread(self):
-        if not self.ut_thread.is_alive():
-            self.stop_uart_thread()
-
+        try:
+            if not self.ut_thread.is_alive():
+                self.stop_uart_thread()
+        except Exception as e:
+            self.sle_logger.error(e)
+            
     def start_uart_thread(self,COM):
         self.ut_thread = threading.Thread(target=uart_thread, args=(self.ut,COM))
         self.ut_thread.start()
         self.ut.sle_uart_data_clear()
         self.ut.sn_reset()
-        self.ut.sle_hearbeat()
         threading.Timer(1.0, self.heartbeat_thread).start()
         self.Mainwin.main_signal.set_text("open")
         self.Mainwin.main_signal.start()

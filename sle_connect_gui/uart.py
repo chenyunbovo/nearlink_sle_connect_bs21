@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import serial_asyncio
 
 def CRC_Check(CRC_Ptr, LEN):
@@ -10,12 +11,12 @@ def CRC_Check(CRC_Ptr, LEN):
                 CRC_Value = (CRC_Value >> 1) ^ 0xA001
             else:
                 CRC_Value = (CRC_Value >> 1)
-            # print("CRC_Value:0x%04X" %CRC_Value)
     CRC_Value = ((CRC_Value >> 8) + (CRC_Value * 256))
     return CRC_Value & 0xFFFF
 
 class uart:
     def __init__(self, SLE):
+        self.sle_logger = logging.getLogger('sle_logger')
         self.port = None
         self._PC_SN = 1
         self._SLE_SERVER_LIST = []
@@ -32,7 +33,8 @@ class uart:
         except Exception as e:
             self.rec_task = None
             self.write_task = None
-            print(e)
+            self.SLE.Mainwin.settingInterface.uart_signal.set_text(e.args[0])
+            self.SLE.Mainwin.settingInterface.uart_signal.start()
             return
         self.rec_task = asyncio.create_task(self.read_from_serial(self.reader))
         self.write_task = asyncio.create_task(self.write(self.writer))
@@ -108,7 +110,7 @@ class uart:
 
     def uart_send(self, data):
         self.data.append(data)
-        print("send data:", data.hex())
+        self.sle_logger.debug("send data:" + data.hex())
 
     def __uart_cmd_parse(self, cmd, value_len, value):
         data = value.hex()
@@ -117,7 +119,7 @@ class uart:
         elif cmd == 0x0001:
             MAC = data[0:12]
             conn_id = int(data[12:14], 16)
-            print(f"连接SLE设备成功，MAC:{MAC},conn_id:{conn_id}")
+            self.sle_logger.debug(f"连接SLE设备成功，MAC:{MAC},conn_id:{conn_id}")
             for _ in self._SLE_SERVER_LIST:
                 if _['MAC'] == MAC:
                     _['conn_id'] = conn_id
@@ -127,7 +129,7 @@ class uart:
         elif cmd == 0x0002:
             MAC = data[0:12]
             reason = data[12:14]
-            print(f"断开SLE设备连接，MAC:{MAC},原因:{reason}")
+            self.sle_logger.warning(f"断开SLE设备连接，MAC:{MAC},原因:{reason}")
             for _ in self._SLE_SERVER_LIST:
                 if _['MAC'] == MAC:
                     _['connect'] = False
@@ -139,7 +141,7 @@ class uart:
                 rssi -= 0x100
             MAC = data[4:16]
             data = data[16:]
-            # print(f"扫描到SLE设备数据类型:{Type},RSSI:{rssi},MAC:{MAC},数据:{data}")
+            self.sle_logger.debug(f"扫描到SLE设备数据类型:{Type},RSSI:{rssi},MAC:{MAC},数据:{data}")
             for _ in self._SLE_SERVER_LIST:
                 if _['MAC'] == MAC:
                     _[Type] = data
@@ -163,7 +165,7 @@ class uart:
             rssi = int(data[2:4], 16)
             if rssi >= 0x80:
                 rssi -= 0x100
-            print(f"获取SLE设备RSSI成功，conn_id:{conn_id},RSSI:{rssi}")
+            self.sle_logger.debug(f"获取SLE设备RSSI成功，conn_id:{conn_id},RSSI:{rssi}")
             for _ in self._SLE_SERVER_LIST:
                 if _['conn_id'] == conn_id:
                     _['RSSI'] = rssi
@@ -176,12 +178,12 @@ class uart:
                     mac = _['MAC']
                     self.SLE.sle_rec_data_cb(mac, msg)
                     break
-            print(f"收到SLE设备数据：mac:{mac},conn_id:{conn_id},数据：{msg}")
+            self.sle_logger.debug(f"收到SLE设备数据：mac:{mac},conn_id:{conn_id},数据：{msg}")
         elif cmd == 0x0006:
             conn_id = int(data[0:2], 16)
             handle = int(data[2:6], 16)
             Type = int(data[6:8], 16)
-            print(f"SLE property查找成功，conn_id:{conn_id},handle:{handle},Type:{Type}")
+            self.sle_logger.debug(f"SLE property查找成功，conn_id:{conn_id},handle:{handle},Type:{Type}")
             for _ in self._SLE_SERVER_LIST:
                 if _['conn_id'] == conn_id:
                     _['handle'] = handle
@@ -189,7 +191,7 @@ class uart:
                     break
 
     def __uart_recv_data_handle(self, data):
-        print("recv data:", data.hex())
+        self.sle_logger.debug("recv data:" + data.hex())
         if self.__last_data != None:
             data = self.__last_data + data
             self.__last_data = None
@@ -215,25 +217,22 @@ class uart:
                             i += value_len + 4
                         index += lenth + 4
                     else:
-                        # print("serial data flag error!")
+                        self.sle_logger.error("serial data flag error!")
                         index += 1
                 else:
-                    print(f"CRC RECV:{crc:04x}")
-                    print(f"CRC CALC:{CRC_Check(data[index:index + lenth + 2], lenth + 2):04x}")
-                    print("serial data CRC error!")
+                    self.sle_logger.error(f"serial data CRC error!CRC RECV:{crc:04x},CRC CALC:{CRC_Check(data[index:index + lenth + 2], lenth + 2):04x}!")
                     index += 1
             else:
                 index += 1
-                # print("serial data head error!")
+                self.sle_logger.error("serial data head error!")
 
     async def read_from_serial(self,reader):
         while True:
             data = await reader.read(1000)
             try:
-
                 self.__uart_recv_data_handle(data)
             except Exception as e:
-                print(e)
+                self.sle_logger.error(e.args[0])
     
     async def write(self, writer):
         while True:

@@ -1,16 +1,18 @@
+import logging
+import datetime
 import threading
 from time import sleep
-import datetime
 
 from PyQt5.QtCore import Qt,QThread,pyqtSignal
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QFrame, QButtonGroup
 
-from qfluentwidgets import (QColor,TextEdit,MessageBox, PrimaryPushButton,IndeterminateProgressRing, SubtitleLabel, LineEdit, RadioButton)
+from qfluentwidgets import (QColor, TextEdit, MessageBox, PrimaryPushButton,IndeterminateProgressRing, SubtitleLabel, LineEdit, RadioButton)
 from qfluentwidgets import FluentIcon as FIF
 
 class DevWidget(QFrame):
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
+        self.sle_logger = logging.getLogger('sle_logger')
         from main import SLE
         self.sle_entity:SLE = parent.sle_entity
         self.dev_signal = DEV_SIGNAL()
@@ -25,12 +27,7 @@ class DevWidget(QFrame):
         self.scd_thread_flag = 1
         self.scd_thread = threading.Thread(target=self.sle_connect_detecte_thread)
         self.scd_thread.start()
-        # self.test()
-
-    def test(self):
-        for i in range(len(self.sle_entity.ut._SLE_SERVER_LIST)):
-            if self.sle_entity.ut._SLE_SERVER_LIST[i]['MAC'] == self.mac:
-                self.sle_entity.ut._SLE_SERVER_LIST[i]['connect'] = True
+        self.sle_logger.info('Device: '+text+' init Success!')
 
     def receive_dev_signal(self, text):
         for device in self.sle_entity.ut._SLE_SERVER_LIST:
@@ -99,6 +96,7 @@ class DevWidget(QFrame):
         if self.get_button_group_selected() == 'HEX':
             if len(text) != 0:
                 if text[-1] not in '0123456789ABCDEFabcdef ':
+                    self.sle_logger.warning('Device[' + self.mac + ']' + ' Invalid HEX character combination("0-9","A-F","a-f"," ")!Please check!')
                     w = MessageBox(
                         '警告',
                         '不是有效HEX字符组合("0-9","A-F","a-f"," ")!',
@@ -116,10 +114,12 @@ class DevWidget(QFrame):
             self.last_button = 'ASCII'
             self.hex_text = self.user_edit.text()
             self.user_edit.setText(self.ascii_text)
+            self.sle_logger.info('Device[' + self.mac + ']' + '编码形式ASCII->HEX')
         elif obj.text() == 'HEX' and self.last_button == 'ASCII':
             self.last_button = 'HEX'
             self.ascii_text = self.user_edit.text()
             self.user_edit.setText(self.hex_text)
+            self.sle_logger.info('Device[' + self.mac + ']' + '编码形式HEX->ASCII')
 
     def get_button_group_selected(self):
         return self.button_group.checkedButton().text()
@@ -130,7 +130,7 @@ class DevWidget(QFrame):
                 data = self.user_edit.text().encode('gb2312')
                 self.text_edit_append('发->'+self.user_edit.text())
             except Exception as e:
-                print(e)
+                self.sle_logger.error('Device[' + self.mac + ']' + e.args[0])
         else:
             data = []
             send_source = ''
@@ -179,6 +179,7 @@ class DevWidget(QFrame):
             MAC.append(int(self.mac[i:i+2], 16))
         self.sle_entity.ut.sle_disconnect_server(MAC)
         self.stop_thread()
+        self.sle_logger.info('Device[' + self.mac + ']' + "Close Device!")
         self.close()
 
     def sle_connect_detecte_thread(self):
@@ -194,20 +195,26 @@ class DevWidget(QFrame):
         now = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
         text = f"[{now}]{text}"
         self.dev_signal.set_text(text)
+        self.sle_logger.info('Device[' + self.mac + ']' + text)
         self.dev_signal.start()
 
     def stop_thread(self):
+        self.sle_logger.info('Device[' + self.mac + ']' + "Stop connect thread!")
         self.scd_thread_flag = 0
 
 class DEV_SIGNAL(QThread):
     signal = pyqtSignal(str)
     text_edit_signal = pyqtSignal(str)
+    texts = []
 
     def set_text(self,text):
-        self.text = text
+        self.texts.append(text)
 
     def run(self):
-        if self.text == 'dev':
-            self.signal.emit("dev")
-        else:
-            self.text_edit_signal.emit(self.text)
+        if len(self.texts) != 0:
+            text = self.texts.pop(0)
+            if text == 'dev':
+                self.signal.emit("dev")
+            else:
+                self.text_edit_signal.emit(self.text)
+            self.start()

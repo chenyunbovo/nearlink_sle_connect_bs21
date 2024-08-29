@@ -1,13 +1,11 @@
 import threading
 
 from time import sleep
+import logging
+from PyQt5.QtCore import Qt, QThread,pyqtSignal
+from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QFrame, QTreeWidgetItem
 
-from PyQt5.QtCore import Qt, QSize, QThread,pyqtSignal
-from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QApplication, QFrame, QWidget, QTreeWidgetItem
-
-from qfluentwidgets import (NavigationItemPosition, MessageBox, MSFluentTitleBar, MSFluentWindow,
-                            TabBar, SubtitleLabel, setFont, PrimaryPushButton, IconWidget,
-                            TransparentDropDownToolButton, IndeterminateProgressRing, setTheme, TreeWidget)
+from qfluentwidgets import (NavigationItemPosition, MessageBox, PrimaryPushButton, IndeterminateProgressRing, TreeWidget)
 from qfluentwidgets import FluentIcon as FIF
 from device_interface import DevWidget
 
@@ -16,24 +14,13 @@ class TabInterface(QFrame):
         super().__init__(parent=parent)
         from main import SLE
         self.sle_entity:SLE = parent.sle_entity
+        self.sle_logger = logging.getLogger('sle_logger')
         self.layout = QHBoxLayout(self)
         self.setObjectName(objectName)
         self.create_scan_widget()
         self.home_signal = HOME_SIGNAL()
         self.home_signal.signal.connect(self.receive_home_signal)
-        # self.sle_entity.ut_thread = 1
-        # server_dic = {
-        #     0x03: None,
-        #     0x0b: None,
-        #     "RSSI": -50,
-        #     "MAC": "110022003300",
-        #     'conn_id': 0x00,
-        #     'handle': 0x0003,
-        #     'Type': 0x00,
-        #     'connect': False,
-        # }
-        # self.insert_item(server_dic)
-        # self.sle_entity.ut._SLE_SERVER_LIST.append(server_dic)
+        self.sle_logger.info('Home Interface init Success!')
 
     def create_scan_widget(self):
         self.device_vbox = QVBoxLayout()
@@ -70,6 +57,7 @@ class TabInterface(QFrame):
 
     def open_button_clicked(self):
         if self.sle_entity.ut_thread == None:
+            self.sle_logger.warning('请先打开串口再进行连接操作!')
             w = MessageBox(
                 '警告',
                 '请先打开串口再进行连接操作',
@@ -81,9 +69,10 @@ class TabInterface(QFrame):
             if w.exec():
                 return
         elif len(self.tree.selectedIndexes()) == 0:
+            self.sle_logger.warning('请先选择一个设备再进行连接操作!')
             w = MessageBox(
                 '警告',
-                '请先打开选择一个设备再进行连接操作',
+                '请先选择一个设备再进行连接操作',
                 self
             )
             w.yesButton.setText('好的')
@@ -111,6 +100,7 @@ class TabInterface(QFrame):
                 mac.append(int(MAC[i:i+2], 16))
             parent = self.parentWidget().parentWidget().parentWidget().parentWidget()
             parent.addSubInterface(DevWidget(MAC,parent=parent), FIF.TAG, MAC, position=NavigationItemPosition.TOP)
+            self.sle_logger.info('连接设备:'+MAC)
             self.sle_entity.ut.sle_connect_server(mac)
 
     def scan_done(self):
@@ -141,6 +131,7 @@ class TabInterface(QFrame):
 
     def scan_button_clicked(self):
         if self.sle_entity.ut_thread == None:
+            self.sle_logger.warning('请先打开串口再进行连接操作!')
             w = MessageBox(
                 '警告',
                 '请先打开串口再进行连接操作',
