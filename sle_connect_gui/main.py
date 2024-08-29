@@ -1,6 +1,7 @@
 import threading
 import os
 import sys
+import logging
 import serial
 import serial.tools.list_ports
 from time import sleep
@@ -23,7 +24,7 @@ path = os.path.dirname(os.path.abspath(__file__))
 class MainWindow(FluentWindow):
     def __init__(self):
         super().__init__()
-        self.titleBar
+        self.sle_logger = logging.getLogger('sle_logger')
         self.sle_entity = SLE(self)
         self.navigationInterface.panel.setReturnButtonVisible(False)
 
@@ -35,7 +36,7 @@ class MainWindow(FluentWindow):
 
         self.main_signal = SLE_SIGNAL()
         self.main_signal.signal.connect(self.receive_main_signal)
-
+        self.sle_logger.info('MainWindow init')
         self.initNavigation()
         self.initWindow()
 
